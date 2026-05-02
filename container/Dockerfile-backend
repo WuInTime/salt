@@ -9,8 +9,8 @@ RUN wget https://apt.llvm.org/llvm.sh && \
     sudo ./llvm.sh 20 && \
     apt-get install -y libmlir-20-dev mlir-20-tools libpolly-20-dev
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
-ENV MLIR_SYS_200_PREFIX=/usr/lib/llvm-20/
-ENV TABLEGEN_200_PREFIX=/usr/lib/llvm-20/
+ENV MLIR_SYS_210_PREFIX=/usr/lib/llvm-21/
+ENV TABLEGEN_210_PREFIX=/usr/lib/llvm-21/
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN mkdir /server && \
     cd /build && \

@@ -15,12 +15,12 @@ tracing = { version = "0.1", default-features = false, features = [
     "release_max_level_info",
 ] }
 palc = { git = "https://github.com/oxalica/palc" }
-melior = { version = "0.24.0" }
+melior = { version = "0.26.9" }
 anyhow = { version = "1.0.98", features = ["backtrace"] }
 symbolica = { version = "0.20.0", default-features = false }
 comfy-table = "7.1.4"
 ahash = "0.8.12"
-gmp-mpfr-sys = { version = "1.6.5", features = ["use-system-libs"] }
+gmp-mpfr-sys = "1.6.5"
 serde = { version = "1.0.219", features = ["derive"] }
 mimalloc = { version = "0.1.48", features = ["override", "v3"] }
 serde_json = "1.0.140"

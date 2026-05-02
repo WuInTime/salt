@@ -15,8 +15,8 @@ sudo ./llvm.sh 20
 sudo apt install build-essential cmake autoconf libtool
 
 # set environment variables
-export MLIR_SYS_200_PREFIX=/usr/lib/llvm-20
-export TABLEGEN_200_PREFIX=/usr/lib/llvm-20
+export MLIR_SYS_210_PREFIX=/usr/lib/llvm-21
+export TABLEGEN_210_PREFIX=/usr/lib/llvm-21
 
 # build and test
 cargo build --release
@@ -36,7 +36,7 @@ direnv allow
 For my machine, keep these variables local to the repo by using `.envrc` and the workspace VS Code settings below. On Fedora, install `direnv` first, enable the shell hook, then run `direnv allow` once in the project root so it loads automatically whenever you enter this workspace.
 
 ```bash
-export PATH="/home/ywu/.local/llvm-20-mlir/bin:$PATH"; export MLIR_SYS_200_PREFIX=/home/ywu/.local/llvm-20-mlir; export TABLEGEN_200_PREFIX=/home/ywu/.local/llvm-20-mlir; export SYMBOLICA_HIDE_BANNER=1
+export PATH="/home/ywu/.local/llvm-21-mlir/bin:$PATH"; export MLIR_SYS_210_PREFIX=/home/ywu/.local/llvm-21-mlir; export TABLEGEN_210_PREFIX=/home/ywu/.local/llvm-21-mlir; export SYMBOLICA_HIDE_BANNER=1
 ```
 
 Build the analyzer:
@@ -75,9 +75,9 @@ target/release/analyzer -i analyzer/misc/sym_heat_center_only.mlir -m test.svg -
 - Use the repo-root `.envrc` to load the local LLVM toolchain automatically
   ```bash
   # .envrc
-  export PATH="/home/ywu/.local/llvm-20-mlir/bin:$PATH"
-  export MLIR_SYS_200_PREFIX=/usr/lib/llvm-20
-  export TABLEGEN_200_PREFIX=/usr/lib/llvm-20
+  export PATH="/home/ywu/.local/llvm-21-mlir/bin:$PATH"
+  export MLIR_SYS_210_PREFIX=/usr/lib/llvm-21
+  export TABLEGEN_210_PREFIX=/usr/lib/llvm-21
   export SYMBOLICA_HIDE_BANNER=1
   ```
 
@@ -88,20 +88,20 @@ target/release/analyzer -i analyzer/misc/sym_heat_center_only.mlir -m test.svg -
   ```json
   <!-- {
     "rust-analyzer.cargo.extraEnv": {
-        "MLIR_SYS_200_PREFIX" : "/usr/lib/llvm-20",
-        "TABLEGEN_200_PREFIX" : "/usr/lib/llvm-20",
+        "MLIR_SYS_210_PREFIX" : "/usr/lib/llvm-21",
+        "TABLEGEN_210_PREFIX" : "/usr/lib/llvm-21",
     },
     "rust-analyzer.check.extraEnv": {
-        "MLIR_SYS_200_PREFIX" : "/usr/lib/llvm-20",
-        "TABLEGEN_200_PREFIX" : "/usr/lib/llvm-20",
+        "MLIR_SYS_210_PREFIX" : "/usr/lib/llvm-21",
+        "TABLEGEN_210_PREFIX" : "/usr/lib/llvm-21",
     },
     "rust-analyzer.server.extraEnv": {
-        "MLIR_SYS_200_PREFIX" : "/usr/lib/llvm-20",
-        "TABLEGEN_200_PREFIX" : "/usr/lib/llvm-20",
+        "MLIR_SYS_210_PREFIX" : "/usr/lib/llvm-21",
+        "TABLEGEN_210_PREFIX" : "/usr/lib/llvm-21",
     },
     "rust-analyzer.runnables.extraEnv": {
-        "MLIR_SYS_200_PREFIX" : "/usr/lib/llvm-20",
-        "TABLEGEN_200_PREFIX" : "/usr/lib/llvm-20",
+        "MLIR_SYS_210_PREFIX" : "/usr/lib/llvm-21",
+        "TABLEGEN_210_PREFIX" : "/usr/lib/llvm-21",
     }, -->
     "editor.formatOnSave": true,
     "files.insertFinalNewline": true,

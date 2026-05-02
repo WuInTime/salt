@@ -4,7 +4,10 @@ use std::{
     fmt::Write,
 };
 
-use melior::ir::{BlockLike, BlockRef, OperationRef, RegionLike, Value, ValueLike};
+use melior::ir::{
+    BlockLike, BlockRef, OperationRef, RegionLike, Value, ValueLike,
+    operation::OperationLike,
+};
 use rustc_hash::FxHashMapRand;
 pub use ustr::Ustr;
 

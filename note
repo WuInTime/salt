@@ -8,13 +8,13 @@ python analyzer/misc/run-analyzer.py
 =====================================================
 The following is working:
 
-export INSTALL_PREFIX="${HOME}/.local/llvm-20-mlir"
+export INSTALL_PREFIX="${HOME}/.local/llvm-21-mlir"
 export PATH="$INSTALL_PREFIX/bin:$PATH"
-export MLIR_SYS_200_PREFIX=$INSTALL_PREFIX
-export TABLEGEN_200_PREFIX=$INSTALL_PREFIX
+export MLIR_SYS_210_PREFIX=$INSTALL_PREFIX
+export TABLEGEN_210_PREFIX=$INSTALL_PREFIX
 export LIBCLANG_PATH="$INSTALL_PREFIX/lib"
 export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib:$LD_LIBRARY_PATH"
-export BINDGEN_EXTRA_CLANG_ARGS="-I$INSTALL_PREFIX/lib/clang/20/include"
+export BINDGEN_EXTRA_CLANG_ARGS="-I$INSTALL_PREFIX/lib/clang/21/include"
 
 cargo clean
 cargo run --bin analyzer -- --help
@@ -35,10 +35,33 @@ cargo run --bin analyzer -- --help
 
 Or you can append this into config.toml under .cargo directory at the root directory of this project: Seems to be not working
 [env]
-INSTALL_PREFIX = "/home/ywu/.local/llvm-20-mlir"
-# PATH = { value = "/home/ywu/.local/llvm-20-mlir/bin", force = false } # Cargo [env] cannot safely prepend PATH
-MLIR_SYS_200_PREFIX = "/home/ywu/.local/llvm-20-mlir"
-TABLEGEN_200_PREFIX = "/home/ywu/.local/llvm-20-mlir"
-LIBCLANG_PATH = "/home/ywu/.local/llvm-20-mlir/lib"
-BINDGEN_EXTRA_CLANG_ARGS = "-I/home/ywu/.local/llvm-20-mlir/lib/clang/20/include"
+INSTALL_PREFIX = "/home/ywu/.local/llvm-21-mlir"
+# PATH = { value = "/home/ywu/.local/llvm-21-mlir/bin", force = false } # Cargo [env] cannot safely prepend PATH
+MLIR_SYS_210_PREFIX = "/home/ywu/.local/llvm-21-mlir"
+TABLEGEN_210_PREFIX = "/home/ywu/.local/llvm-21-mlir"
+LIBCLANG_PATH = "/home/ywu/.local/llvm-21-mlir/lib"
+BINDGEN_EXTRA_CLANG_ARGS = "-I/home/ywu/.local/llvm-21-mlir/lib/clang/21/include"
+
+
+
+
+The gmp-mpfr-sys crate provides Rust bindings for three C libraries: GMP, MPFR, and MPC.
+
+When the use-system-libs feature is enabled:
+
+The crate attempts to link dynamically to your operating system's installed versions of these libraries.
+For this to work on Fedora, you would need to have the development headers installed (e.g., gmp-devel, mpfr-devel, and libmpc-devel) because the Rust compiler needs them to generate the native bindings. If any of those are missing or the system library versions are incompatible with what the crate expects, the build process will throw an error (often complaining about missing MPC or MPFR).
+By removing use-system-libs (changing it to just "1.6.5"):
+
+You are telling the crate not to look for the system's C libraries.
+Instead, gmp-mpfr-sys will download the source code for GMP, MPFR, and MPC, and compile them locally as part of your Rust build process. It will then statically link these bundled, known-compatible versions directly into your application.
+This makes your build self-contained and isolated from your Linux distribution's specific package versions. I can see you just installed autoconf, automake, and libtool in your terminal—these are the exact build tools the crate needs to successfully compile those bundled C libraries from source in the background.
+
+sudo dnf install -y \
+  llvm-devel mlir-devel \
+  libxml2-devel \
+  fontconfig-devel pkgconf-pkg-config \
+  gmp-devel mpfr-devel libmpc-devel \
+  autoconf automake libtool \
+  ntl-devel
 
