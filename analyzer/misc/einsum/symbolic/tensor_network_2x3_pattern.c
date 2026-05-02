@@ -1,0 +1,37 @@
+#define DATA_TYPE float
+#define LIMIT 1024
+#define SMALL_LIMIT 16  // Use very small dimensions for complex tensor networks
+typedef __SIZE_TYPE__ size_t;
+
+// 2×3-tensor network: ij,iml,lo,jk,kmn,no->
+// Memory access pattern: complex tensor contraction to scalar
+void kernel_tensor_network_2x3_pattern(size_t I, size_t J, size_t M, size_t L, 
+                                       size_t K, size_t N, size_t O,
+                                       DATA_TYPE A[SMALL_LIMIT][SMALL_LIMIT],           // ij
+                                       DATA_TYPE B[SMALL_LIMIT][SMALL_LIMIT][SMALL_LIMIT], // iml
+                                       DATA_TYPE C[SMALL_LIMIT][SMALL_LIMIT],           // lo
+                                       DATA_TYPE D[SMALL_LIMIT][SMALL_LIMIT],           // jk
+                                       DATA_TYPE E[SMALL_LIMIT][SMALL_LIMIT][SMALL_LIMIT], // kmn
+                                       DATA_TYPE F[SMALL_LIMIT][SMALL_LIMIT],           // no
+                                       DATA_TYPE *result) {
+  int i, j, m, l, k, n, o;
+  
+  *result = 0.0f;
+  
+  // Actual computation for: sum over all indices A[i][j] * B[i][m][l] * C[l][o] * D[j][k] * E[k][m][n] * F[n][o] -> scalar
+  for (i = 0; i < I; i++) {
+    for (j = 0; j < J; j++) {
+      for (m = 0; m < M; m++) {
+        for (l = 0; l < L; l++) {
+          for (k = 0; k < K; k++) {
+            for (n = 0; n < N; n++) {
+              for (o = 0; o < O; o++) {
+                *result += A[i][j] * B[i][m][l] * C[l][o] * D[j][k] * E[k][m][n] * F[n][o];
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

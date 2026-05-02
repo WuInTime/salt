@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = [
+    "raffine",
+    "analyzer",
+    "denning",
+    "analysis-server",
+    "analysis-webpage",
+    "cachegrind-runner",
+    "mrc",
+    "assoc-conv",
+]
+
+[profile.release]
+#lto = "thin"
+debug = true
+opt-level = 3
+
+[profile.wasm-release]
+inherits = "release" # Start with release settings
+opt-level = 's'      # Optimize for size
+lto = true           # More aggressive LTO
+codegen-units = 1    # Better optimizations
+panic = 'abort'      # Smaller code size
+strip = true         # Remove symbols

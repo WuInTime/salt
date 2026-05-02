@@ -1,0 +1,20 @@
+[package]
+name = "cachegrind-runner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+raffine = { path = "../raffine" }
+palc = { git = "https://github.com/oxalica/palc.git" }
+anyhow = { version = "1.0.98", features = ["backtrace"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+melior = { version = "0.24.0"}
+tempfile = "3.20.0"
+unescaper = "0.1.6"
+rusqlite = { version = "0.37.0", features = ["bundled-full"] }
+r2d2_sqlite = "0.31.0"
+r2d2 = "0.8.10"
+indicatif = { version = "0.18.0", features = ["rayon"] }
+rayon = "1.10.0"
+sysinfo = "0.37.2"

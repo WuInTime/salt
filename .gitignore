@@ -1,0 +1,26 @@
+.idea/
+.cache/
+.envrc
+/cmake-build-*
+build
+.clangd
+data/
+/run*
+/fix*
+
+# Added by cargo
+
+/target
+Cargo.lock
+perf.data*
+flamegraph.svg
+*.sqlite
+*.sqlite*
+*.sqlite-journal
+/*.db
+*.db-journal
+*.log
+/*.png
+/*.svg
+result.txt
+.codex

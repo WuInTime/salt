@@ -1,0 +1,27 @@
+[package]
+name = "analyzer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+raffine = { path = "../raffine" }
+denning = { path = "../denning", features = ["plotters"] }
+barvinok = { git = "https://github.com/Roc-Locality/barvinok-rs" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = { version = "0.1", default-features = false, features = [
+    "std",
+    "log",
+    "max_level_trace",
+    "release_max_level_info",
+] }
+palc = { git = "https://github.com/oxalica/palc" }
+melior = { version = "0.24.0" }
+anyhow = { version = "1.0.98", features = ["backtrace"] }
+symbolica = { version = "0.20.0", default-features = false }
+comfy-table = "7.1.4"
+ahash = "0.8.12"
+gmp-mpfr-sys = { version = "1.6.5", features = ["use-system-libs"] }
+serde = { version = "1.0.219", features = ["derive"] }
+mimalloc = { version = "0.1.48", features = ["override", "v3"] }
+serde_json = "1.0.140"
+plotters = "0.3.7"

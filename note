@@ -1,0 +1,44 @@
+python scripts/plot-miss-counts.py scripts/plot-settings.json
+
+
+python analyzer/misc/run-analyzer.py
+
+
+
+=====================================================
+The following is working:
+
+export INSTALL_PREFIX="${HOME}/.local/llvm-20-mlir"
+export PATH="$INSTALL_PREFIX/bin:$PATH"
+export MLIR_SYS_200_PREFIX=$INSTALL_PREFIX
+export TABLEGEN_200_PREFIX=$INSTALL_PREFIX
+export LIBCLANG_PATH="$INSTALL_PREFIX/lib"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib:$LD_LIBRARY_PATH"
+export BINDGEN_EXTRA_CLANG_ARGS="-I$INSTALL_PREFIX/lib/clang/20/include"
+
+cargo clean
+cargo run --bin analyzer -- --help
+
+
+
+    # For single run in terminal, use:
+    # cargo run -r --bin analyzer -- -i {file_path} -m test.svg --json barvinok --block-size=8 --barvinok-arg="--approximation-method={approximation_method}" --infinite-repeat
+    # or
+    # cargo run -r --bin analyzer -- -i analyzer/misc/tiled_matmul_once_tiled.mlir -m test.svg --json barvinok --block-size=8
+
+    # For single of salt in terminal, use:
+    # cargo run -r --bin analyzer -- -i analyzer/misc/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
+    # cargo run --bin analyzer -- -i analyzer/misc/sym_test.mlir -m test.svg --json salt --block-size=8
+
+(Tip: To make this permanent, you can copy all those export lines into your ~/.bashrc file so they are loaded automatically every time you open a terminal).
+
+
+Or you can append this into config.toml under .cargo directory at the root directory of this project: Seems to be not working
+[env]
+INSTALL_PREFIX = "/home/ywu/.local/llvm-20-mlir"
+# PATH = { value = "/home/ywu/.local/llvm-20-mlir/bin", force = false } # Cargo [env] cannot safely prepend PATH
+MLIR_SYS_200_PREFIX = "/home/ywu/.local/llvm-20-mlir"
+TABLEGEN_200_PREFIX = "/home/ywu/.local/llvm-20-mlir"
+LIBCLANG_PATH = "/home/ywu/.local/llvm-20-mlir/lib"
+BINDGEN_EXTRA_CLANG_ARGS = "-I/home/ywu/.local/llvm-20-mlir/lib/clang/20/include"
+
