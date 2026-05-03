@@ -1,0 +1,13 @@
+# Fedora LLVM/MLIR 21 setup.
+# Copy this file to .envrc and edit paths for other distributions or local installs.
+export PATH="/usr/lib64/llvm21/bin:$PATH"
+export MLIR_SYS_210_PREFIX=/usr/lib64/llvm21
+export TABLEGEN_210_PREFIX=/usr/lib64/llvm21
+export LIBCLANG_PATH=/usr/lib64/llvm21/lib64
+export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/21/include"
+export CC=/usr/bin/cc
+export CXX=/usr/bin/c++
+export SYMBOLICA_HIDE_BANNER=1
+
+# Optional: put your local Symbolica license in .envrc, not in this example.
+# export SYMBOLICA_LICENSE="..."
