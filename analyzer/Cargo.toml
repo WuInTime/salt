@@ -17,7 +17,7 @@ tracing = { version = "0.1", default-features = false, features = [
 palc = { git = "https://github.com/oxalica/palc" }
 melior = { version = "0.26.9" }
 anyhow = { version = "1.0.98", features = ["backtrace"] }
-symbolica = { version = "0.20.0", default-features = false }
+symbolica = { version = "1.5.1", default-features = false }
 comfy-table = "7.1.4"
 ahash = "0.8.12"
 gmp-mpfr-sys = "1.6.5"

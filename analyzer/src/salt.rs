@@ -14,7 +14,7 @@ use raffine::{
 use serde::Serialize;
 use symbolica::{atom::Atom, domains::rational_polynomial::FromNumeratorAndDenominator};
 use symbolica::{atom::AtomCore, domains::integer::Integer};
-use symbolica::{domains::Ring, symbol};
+use symbolica::{domains::{Ring, RingOps}, symbol};
 use symbolica::{
     domains::{Field, integer::IntegerRing, rational_polynomial::RationalPolynomialField},
     printer::PrintOptions,

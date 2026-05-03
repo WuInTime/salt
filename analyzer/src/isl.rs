@@ -31,7 +31,7 @@ use serde::Serialize;
 use symbolica::{atom::Atom, domains::Field, domains::integer::IntegerRing};
 use symbolica::{atom::AtomCore, symbol};
 use symbolica::{
-    domains::{Ring, rational_polynomial::RationalPolynomialField},
+    domains::{Ring, RingOps, rational_polynomial::RationalPolynomialField},
     printer::PrintOptions,
 };
 
