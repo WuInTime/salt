@@ -5,6 +5,8 @@
 build
 .clangd
 data/
+data.tar.zst
+*.tar.zst
 /run*
 /fix*
 
