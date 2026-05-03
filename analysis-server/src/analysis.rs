@@ -49,13 +49,13 @@ impl AnalysisRequest {
             use hakoniwa::landlock::*;
             let mut ruleset = Ruleset::default();
             ruleset.restrict(Resource::FS, CompatMode::Enforce);
-            ruleset.add_fs_rule("/bin", FsAccess::R | FsAccess::X);
-            ruleset.add_fs_rule("/lib", FsAccess::R | FsAccess::X);
-            ruleset.add_fs_rule("/lib64", FsAccess::R | FsAccess::X);
-            ruleset.add_fs_rule("/usr", FsAccess::R);
-            ruleset.add_fs_rule("/dev", FsAccess::R);
-            ruleset.add_fs_rule("/tmp", FsAccess::W);
-            ruleset.add_fs_rule("/analyzer", FsAccess::R | FsAccess::X);
+            ruleset.allow_path("/bin", FsAccess::R | FsAccess::X);
+            ruleset.allow_path("/lib", FsAccess::R | FsAccess::X);
+            ruleset.allow_path("/lib64", FsAccess::R | FsAccess::X);
+            ruleset.allow_path("/usr", FsAccess::R);
+            ruleset.allow_path("/dev", FsAccess::R);
+            ruleset.allow_path("/tmp", FsAccess::W);
+            ruleset.allow_path("/analyzer", FsAccess::R | FsAccess::X);
             container.landlock_ruleset(ruleset);
         }
 

@@ -82,7 +82,7 @@ struct Guard<'a> {
     current_requests: &'a AtomicUsize,
 }
 impl AppState {
-    fn try_acquire(&self) -> anyhow::Result<Guard> {
+    fn try_acquire(&self) -> anyhow::Result<Guard<'_>> {
         let mut remaining_try = 128;
         while remaining_try > 0 {
             remaining_try -= 1;
@@ -123,7 +123,7 @@ async fn main() -> std::io::Result<()> {
         .init();
     tracing::info!("Starting server...");
     let canonical_path = options.analyzer_path.canonicalize()?;
-    web::HttpServer::new(move || {
+    web::HttpServer::new(async move || {
         web::App::new()
             .state(AppState {
                 analyzer_path: canonical_path.clone(),

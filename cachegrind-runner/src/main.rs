@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use indicatif::ParallelProgressIterator;
 use melior::ir::attribute::{StringAttribute, TypeAttribute};
+use melior::ir::operation::OperationLike;
 use melior::ir::r#type::MemRefType;
 use melior::ir::{BlockLike, Module, OperationRef, ShapedTypeLike};
 use palc::Parser;
@@ -535,7 +536,13 @@ fn extract_global_arrays(module: &Module) -> anyhow::Result<Vec<GlobalArrayDecla
             let rank = memref_type.rank();
             let mut shape = Vec::with_capacity(rank);
             for dim in 0..rank {
-                shape.push(memref_type.dim_size(dim)?);
+                let dim = match memref_type.dim_size(dim)? {
+                    melior::ir::r#type::DimSize::Static(size) => usize::try_from(size)?,
+                    melior::ir::r#type::DimSize::Dynamic => {
+                        return Err(anyhow!("expected static memref shape"));
+                    }
+                };
+                shape.push(dim);
             }
             arrays.push(GlobalArrayDeclaration {
                 name: sym_name,

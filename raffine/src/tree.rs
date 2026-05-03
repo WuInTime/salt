@@ -5,8 +5,7 @@ use std::{
 };
 
 use melior::ir::{
-    BlockLike, BlockRef, OperationRef, RegionLike, Value, ValueLike,
-    operation::OperationLike,
+    BlockLike, BlockRef, OperationRef, RegionLike, Value, ValueLike, operation::OperationLike,
 };
 use rustc_hash::FxHashMapRand;
 pub use ustr::Ustr;
@@ -451,7 +450,7 @@ impl Context {
 
 #[cfg(test)]
 mod tests {
-    use melior::ir::{BlockLike, Module, RegionLike};
+    use melior::ir::{BlockLike, Module, RegionLike, operation::OperationLike};
 
     use crate::Context;
 
