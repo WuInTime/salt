@@ -64,25 +64,25 @@ fn align_sets<'i, 'a: 'i>(
     add_dim_constraint: bool,
 ) -> Result<()> {
     let space = longest.get_space()?;
-    let longest_dim = longest.num_dims()?;
+    let longest_dim = longest.n_dim()?;
     let local_space = LocalSpace::try_from(space.clone())?;
     for (idx, i) in iter.enumerate() {
-        let length = i.num_dims()?;
+        let length = i.n_dim()?;
         let mut s = i
             .clone()
             .insert_dims(DimType::Out, length, longest_dim - length)?;
-        for j in length..longest.num_dims()? {
+        for j in length..longest.n_dim()? {
             // add constraint eq 0
-            let constraint = Constraint::new_equality(local_space.clone()).set_coefficient_si(
+            let constraint = Constraint::new_equality(local_space.clone())?.set_coefficient_si(
                 DimType::Out,
-                j,
+                j.try_into()?,
                 1,
             )?;
             s = s.add_constraint(constraint)?;
         }
         if add_dim_constraint {
-            let current_dim_eq_i = Constraint::new_equality(local_space.clone())
-                .set_coefficient_si(DimType::Out, depth as u32, 1)?
+            let current_dim_eq_i = Constraint::new_equality(local_space.clone())?
+                .set_coefficient_si(DimType::Out, depth.try_into()?, 1)?
                 .set_constant_si(-(idx as i32))?;
             *i = s.add_constraint(current_dim_eq_i)?;
         }
@@ -98,22 +98,22 @@ fn align_maps<'i, 'a: 'i>(
 ) -> Result<()> {
     let space = longest.get_space()?;
     let local_space = LocalSpace::try_from(space.clone())?;
-    let longest_length = longest.get_space()?.get_dim(DimType::In)?;
+    let longest_length = longest.get_space()?.dim(DimType::In)?;
     for (idx, i) in iter.enumerate() {
-        let length = i.get_space()?.get_dim(DimType::In)?;
+        let length = i.get_space()?.dim(DimType::In)?;
         let mut s = i.clone().add_dims(DimType::In, longest_length - length)?;
         for j in length..longest_length {
             // add constraint eq 0
-            let constraint = Constraint::new_equality(local_space.clone()).set_coefficient_si(
+            let constraint = Constraint::new_equality(local_space.clone())?.set_coefficient_si(
                 DimType::In,
-                j,
+                j.try_into()?,
                 1,
             )?;
             s = s.add_constraint(constraint)?;
         }
         if add_dim_constraint {
-            let current_dim_eq_i = Constraint::new_equality(local_space.clone())
-                .set_coefficient_si(DimType::In, depth as u32, 1)?
+            let current_dim_eq_i = Constraint::new_equality(local_space.clone())?
+                .set_coefficient_si(DimType::In, depth.try_into()?, 1)?
                 .set_constant_si(-(idx as i32))?;
             *i = s.add_constraint(current_dim_eq_i)?;
         }
@@ -164,15 +164,15 @@ fn get_timestamp_space_impl<'a, 'b: 'a>(
                     || anyhow::anyhow!("invalid affine expression: at least one result expression"),
                 )?)?;
             let local_space = LocalSpace::try_from(space.clone())?;
-            let step = Value::new_si(context.bcontext(), *step as i64);
+            let step = Value::int_from_si(context.bcontext(), *step as i64)?;
             let step = Affine::val_on_domain(local_space.clone(), step)?;
             let trip_size = upper_bound
                 .checked_sub(lower_bound)?
                 .checked_div(step)?
-                .checked_ceil()?;
-            let ge_0 = Constraint::new_inequality(local_space.clone()).set_coefficient_si(
+                .ceil()?;
+            let ge_0 = Constraint::new_inequality(local_space.clone())?.set_coefficient_si(
                 DimType::Out,
-                depth as u32,
+                depth.try_into()?,
                 1,
             )?;
             let affine_minus_ivar = trip_size
@@ -183,7 +183,7 @@ fn get_timestamp_space_impl<'a, 'b: 'a>(
                 )?)?
                 .checked_sub(Affine::val_on_domain(
                     local_space.clone(),
-                    Value::new_si(context.bcontext(), 1),
+                    Value::int_from_si(context.bcontext(), 1)?,
                 )?)?;
             let affine_minus_ivar_gt_0 = Constraint::new_inequality_from_affine(affine_minus_ivar);
             ivar_map.pop();
@@ -205,7 +205,7 @@ fn get_timestamp_space_impl<'a, 'b: 'a>(
                 .collect::<Result<Vec<_>>>()?;
             let longest = sub_sets
                 .iter()
-                .max_by_key(|set| set.num_dims().unwrap_or_default())
+                .max_by_key(|set| set.n_dim().unwrap_or_default())
                 .ok_or_else(|| anyhow::anyhow!("no sets found"))?
                 .clone();
             let space = longest.get_space()?;
@@ -239,7 +239,7 @@ fn get_timestamp_space_impl<'a, 'b: 'a>(
                 Set::empty(then_set.get_space()?)?
             };
             // similar to block, align with longest set
-            let longest = if then_set.num_dims()? > else_set.num_dims()? {
+            let longest = if then_set.n_dim()? > else_set.n_dim()? {
                 then_set.clone()
             } else {
                 else_set.clone()
@@ -361,7 +361,7 @@ fn get_access_map_impl<'a, 'b: 'a>(
                 .iter()
                 .max_by_key(|map| {
                     map.get_space()
-                        .and_then(|s| s.get_dim(DimType::In))
+                        .and_then(|s| s.dim(DimType::In))
                         .unwrap_or_default()
                 })
                 .ok_or_else(|| anyhow::anyhow!("no maps found"))?
@@ -390,12 +390,12 @@ fn get_access_map_impl<'a, 'b: 'a>(
             let ValID::Memref(memref) = *memref else {
                 return Err(anyhow::anyhow!("invalid access map: invalid memref"));
             };
-            let val = Value::new_ui(domain_space.context_ref(), memref as u64);
+            let val = Value::int_from_ui(domain_space.context_ref(), memref as u64)?;
             let aff = Affine::val_on_domain_space(domain_space.clone(), val)?;
             aff_list.push(aff);
             // align array dimension
             for _ in 0..max_array_dim - map.num_results() {
-                let val = Value::new_ui(domain_space.context_ref(), 0);
+                let val = Value::int_from_ui(domain_space.context_ref(), 0)?;
                 let aff = Affine::val_on_domain_space(domain_space.clone(), val)?;
                 aff_list.push(aff);
             }
@@ -406,7 +406,8 @@ fn get_access_map_impl<'a, 'b: 'a>(
                 tracing::debug!("expr: {}", expr);
                 let mut aff = converter.convert_polynomial(expr)?;
                 if block_size > 1 && i == map.num_results() - 1 {
-                    let block_size = Value::new_ui(domain_space.context_ref(), block_size as u64);
+                    let block_size =
+                        Value::int_from_ui(domain_space.context_ref(), block_size as u64)?;
                     let block_size = Affine::val_on_domain_space(domain_space.clone(), block_size)?;
                     aff = aff.checked_div(block_size)?;
                     aff = aff.floor()?;
@@ -414,8 +415,8 @@ fn get_access_map_impl<'a, 'b: 'a>(
                 if num_sets.get() > 1 && i == map.num_results() - 1 {
                     // add set dimension
                     let num_sets_value =
-                        Value::new_ui(domain_space.context_ref(), num_sets.get() as u64);
-                    let set_tag = aff.clone().mod_val(num_sets_value)?;
+                        Value::int_from_ui(domain_space.context_ref(), num_sets.get() as u64)?;
+                    let set_tag = aff.clone().modulo(num_sets_value)?;
                     aff_list.push(set_tag);
                 }
                 aff_list.push(aff);
@@ -569,7 +570,7 @@ impl<'isl, 'mlir, 'map> ExprConverter<'isl, 'mlir, 'map> {
                 let constant = expr.get_value().ok_or_else(|| {
                     anyhow::anyhow!("invalid affine expression: invalid constant")
                 })?;
-                let value = Value::new_si(self.local_space.context_ref(), constant);
+                let value = Value::int_from_si(self.local_space.context_ref(), constant)?;
                 Ok(Affine::val_on_domain(self.local_space.clone(), value)?)
             }
             AffineExprKind::FloorDiv => {
@@ -615,7 +616,7 @@ impl<'isl, 'mlir, 'map> ExprConverter<'isl, 'mlir, 'map> {
                     self.ivar_map[n].index as u32,
                 )?;
                 let step_size =
-                    Value::new_si(self.local_space.context_ref(), self.ivar_map[n].step_size);
+                    Value::int_from_si(self.local_space.context_ref(), self.ivar_map[n].step_size)?;
                 let step_size = Affine::val_on_domain(self.local_space.clone(), step_size)?;
                 let converter = Self {
                     local_space: self.local_space.clone(),
@@ -689,7 +690,7 @@ impl<'a> RIProcessor<'a> {
             let mut domain = piece.domain.clone();
             for (shift, dim) in involved_dims.iter().enumerate() {
                 // TODO: this should not unwrap
-                let num_params = domain.get_dims(DimType::Param).unwrap();
+                let num_params = domain.dim(DimType::Param).unwrap();
                 domain = domain.move_dims(
                     DimType::Param,
                     num_params,
@@ -851,12 +852,13 @@ impl<'a> QpolyConverter<'a> {
         for ty in [DimType::Param, DimType::In] {
             let n = aff.dim(ty)?;
             for i in 0..n {
-                let coeff = aff.get_coefficient_val(ty, i)?;
+                let coeff = aff.get_coefficient_val(ty, i as i32)?;
                 let coeff = self.value_to_rational_poly(coeff);
                 if coeff.is_zero() {
                     continue;
                 }
-                let v = Atom::var(symbol!(self.space.get_dim_name(ty, i)?));
+                let name = self.space.get_dim_name(ty, i)?.unwrap_or("_");
+                let v = Atom::var(symbol!(name));
                 let term = self.field.mul(
                     &coeff,
                     &v.to_rational_polynomial(&self.ring, &self.ring, None),
@@ -869,8 +871,8 @@ impl<'a> QpolyConverter<'a> {
 
     fn term_to_rational_poly(&self, term: Term<'a>) -> std::result::Result<Poly, barvinok::Error> {
         let mut poly = self.value_to_rational_poly(term.coefficient()?);
-        let params = self.space.get_dim(DimType::Param)?;
-        let in_dims = self.space.get_dim(DimType::In)?;
+        let params = self.space.dim(DimType::Param)?;
+        let in_dims = self.space.dim(DimType::In)?;
         let dims = std::iter::repeat_n(DimType::Param, params as usize)
             .enumerate()
             .chain(std::iter::repeat_n(DimType::Out, in_dims as usize).enumerate());
@@ -882,7 +884,7 @@ impl<'a> QpolyConverter<'a> {
                 } else {
                     DimType::In
                 };
-                let name = self.space.get_dim_name(ty, i as u32)?;
+                let name = self.space.get_dim_name(ty, i as u32)?.unwrap_or("_");
                 let symbol = symbol!(name);
                 let exp = Atom::num(exp as i64);
                 let atom = Atom::var(symbol).pow(exp);
@@ -918,8 +920,8 @@ impl<'a> QpolyConverter<'a> {
 }
 
 pub(crate) fn ensure_set_name<'a>(mut set: Set<'a>) -> Result<Set<'a>> {
-    let params = set.num_params()?;
-    let dims = set.num_dims()?;
+    let params = set.n_param()?;
+    let dims = set.n_dim()?;
     for i in 0..params {
         if !set.has_dim_name(DimType::Param, i)? {
             set = set.set_dim_name(DimType::Param, i, &format!("p{i}"))?;
@@ -993,14 +995,18 @@ fn evaluate_poly<'a>(poly: &Poly, point: &Point<'a>) -> Result<f64> {
         })
         .collect::<AHashMap<String, Atom>>();
     let space = point.get_space()?;
-    let dims = space.get_dim(DimType::Out)?;
+    let dims = space.dim(DimType::Out)?;
     let mut const_map = AHashMap::new();
     for i in 0..dims {
-        let name = space.get_dim_name(DimType::Out, i)?;
+        let Some(name) = space.get_dim_name(DimType::Out, i)? else {
+            continue;
+        };
         let Some(atom) = name_map.get(name).cloned() else {
             continue;
         };
-        let val = point.get_coordinate_val(DimType::Out, i)?.to_f64();
+        let val = point
+            .get_coordinate_val(DimType::Out, i.try_into()?)?
+            .to_f64();
         const_map.insert(atom, val);
     }
     let expr = poly.to_expression();
@@ -1009,10 +1015,12 @@ fn evaluate_poly<'a>(poly: &Poly, point: &Point<'a>) -> Result<f64> {
 }
 
 fn convert_bounded_set<'a>(mut set: Set<'a>) -> Result<Set<'a>> {
-    let mut num_params = set.num_params()?;
+    let mut num_params = set.n_param()?;
     let mut infinite_repeat_dim = None;
     for i in 0..num_params {
-        let name = set.get_dim_name(DimType::Param, i)?;
+        let name = set
+            .get_dim_name(DimType::Param, i)?
+            .ok_or_else(|| anyhow::anyhow!("parameter dimension {i} has no name"))?;
         if name.starts_with("p") {
             return Err(anyhow::anyhow!(
                 "all parameters must be instantiated for numerical analysis"

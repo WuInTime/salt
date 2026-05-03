@@ -65,3 +65,11 @@ sudo dnf install -y \
   autoconf automake libtool \
   ntl-devel
 
+
+The reason you need the operation::OperationLike import now is because the melior dependency was upgraded.
+
+According to the output from git diff HEAD~1 analyzer/Cargo.toml, your project recently changed the melior dependency version from "0.24.0" to "0.26.9".
+
+In older versions of melior (like 0.24.0), OperationRef and similar struct types directly implemented those methods. However, in newer versions of the crate (starting around v0.25.0+), the developers of melior refactored the API and moved many core operation utilities into the generic OperationLike trait. This forces consumers of the API to explicitly import the trait in order to access methods like .name(), .attribute(), and .next_in_block() on the operation types.
+
+Because the underlying API architecture changed across those versions, the explicit import use melior::ir::operation::OperationLike; is now mandatory.
