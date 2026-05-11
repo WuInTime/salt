@@ -1160,10 +1160,19 @@ pub fn create_json_output<'a>(
     let field = RationalPolynomialField::new(ring);
     for item in dist.iter() {
         let value = convert_quasi_poly(item.qpoly.clone())?;
-        let value_str = format!("{}", value.to_expression().printer(PrintOptions::latex()));
+        let value_str = format!(
+            "{}",
+            value
+                .to_expression()
+                .printer(PrintOptions::file_no_namespace())
+        );
         item.cardinality.foreach_piece(|qpoly, domain| {
             let poly = convert_quasi_poly(qpoly.clone())?;
-            let count = format!("{}", poly.to_expression().printer(PrintOptions::latex()));
+            let count = format!(
+                "{}",
+                poly.to_expression()
+                    .printer(PrintOptions::file_no_namespace())
+            );
             let range = format!("{domain:?}");
             let range = range
                 .split("{  : ")
@@ -1209,7 +1218,12 @@ pub fn create_json_output<'a>(
             } else {
                 field.div(&poly, &total_count_poly)
             };
-            let portion_str = format!("{}", portion.to_expression().printer(PrintOptions::latex()));
+            let portion_str = format!(
+                "{}",
+                portion
+                    .to_expression()
+                    .printer(PrintOptions::file_no_namespace())
+            );
             ri_values.push(value_str.clone());
             symbol_ranges.push(range.to_string());
             counts.push(count);
@@ -1225,7 +1239,7 @@ pub fn create_json_output<'a>(
         "{}",
         total_count_poly
             .to_expression()
-            .printer(PrintOptions::latex())
+            .printer(PrintOptions::file_no_namespace())
     );
     let miss_ratio_curve = MissRatioCurve::new(&distribution);
     let analysis_time = start_time.elapsed();

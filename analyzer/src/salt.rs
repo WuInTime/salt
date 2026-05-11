@@ -14,10 +14,13 @@ use raffine::{
 use serde::Serialize;
 use symbolica::{atom::Atom, domains::rational_polynomial::FromNumeratorAndDenominator};
 use symbolica::{atom::AtomCore, domains::integer::Integer};
-use symbolica::{domains::{Ring, RingOps}, symbol};
 use symbolica::{
     domains::{Field, integer::IntegerRing, rational_polynomial::RationalPolynomialField},
     printer::PrintOptions,
+};
+use symbolica::{
+    domains::{Ring, RingOps},
+    symbol,
 };
 
 use crate::{
@@ -366,7 +369,7 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
                         let without_block = &p_factor - &prev_portion;
                         let with_block = field.div(&without_block, &block_poly);
                         addition = &addition + &(&without_block - &with_block);
-                        let tmp = &field.div(&with_block, &n_ref) - &imaginary_portion;
+                        let tmp = field.div(&with_block, &n_ref);
                         if tmp != isize_to_poly(0, context) {
                             ri_dist.insert(i.clone(), tmp);
                         }
@@ -414,16 +417,22 @@ pub fn get_ri_distro(dist: &[(Poly, Poly)]) -> anyhow::Result<Vec<(isize, f64)>>
     let mut distro_map = AHashMap::new();
     let empty_const_map = AHashMap::<Atom, _>::new();
     let empty_symbol_map = AHashMap::new();
+    let mut saw_numeric_value = false;
     for (value, portion) in dist.iter() {
-        let value = value
+        let Ok(value) = value
             .to_expression()
             .evaluate(|x| x.to_f64(), &empty_const_map, &empty_symbol_map)
-            .map_err(|e| anyhow::anyhow!("Failed to evaluate expression: {e}"))?
-            as isize;
-        let portion = portion
+        else {
+            continue;
+        };
+        let Ok(portion) = portion
             .to_expression()
             .evaluate(|x| x.to_f64(), &empty_const_map, &empty_symbol_map)
-            .map_err(|e| anyhow::anyhow!("Failed to evaluate expression: {e}"))?;
+        else {
+            continue;
+        };
+        saw_numeric_value = true;
+        let value = value as isize;
         match distro_map.entry(value) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 *entry.get_mut() += portion;
@@ -432,6 +441,9 @@ pub fn get_ri_distro(dist: &[(Poly, Poly)]) -> anyhow::Result<Vec<(isize, f64)>>
                 entry.insert(portion);
             }
         }
+    }
+    if !saw_numeric_value {
+        return Ok(Vec::new());
     }
     let mut distro = distro_map.into_iter().chain([(0, 0.0)]).collect::<Vec<_>>();
     distro.sort_by(|a, b| a.0.cmp(&b.0));
@@ -471,7 +483,7 @@ where
         .iter()
         .map(|(poly, _)| {
             poly.to_expression()
-                .printer(PrintOptions::latex())
+                .printer(PrintOptions::file_no_namespace())
                 .to_string()
         })
         .collect();
@@ -479,15 +491,15 @@ where
         .iter()
         .map(|(_, poly)| {
             poly.to_expression()
-                .printer(PrintOptions::latex())
+                .printer(PrintOptions::file_no_namespace())
                 .to_string()
         })
         .collect();
     let total_count = total_count
         .to_expression()
-        .printer(PrintOptions::latex())
+        .printer(PrintOptions::file_no_namespace())
         .to_string();
-    let distribution = get_ri_distro(dist).unwrap_or_default().into_boxed_slice();
+    let distribution = get_ri_distro(dist)?.into_boxed_slice();
     let miss_ratio_curve = MissRatioCurve::new(&distribution);
     let analysis_time = start_time.elapsed();
     let result = SaltResult {
@@ -497,6 +509,5 @@ where
         miss_ratio_curve,
         analysis_time,
     };
-    serde_json::to_string(&result)
-        .map_err(|e| anyhow::anyhow!("Failed to serialize to JSON: {e}"))
+    serde_json::to_string(&result).map_err(|e| anyhow::anyhow!("Failed to serialize to JSON: {e}"))
 }

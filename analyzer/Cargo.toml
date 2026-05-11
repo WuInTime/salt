@@ -3,10 +3,14 @@ name = "analyzer"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["barvinok"]
+barvinok = ["dep:barvinok"]
+
 [dependencies]
 raffine = { path = "../raffine" }
 denning = { path = "../denning", features = ["plotters"] }
-barvinok = { git = "https://github.com/Roc-Locality/barvinok-rs" }
+barvinok = { git = "https://github.com/Roc-Locality/barvinok-rs", optional = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = { version = "0.1", default-features = false, features = [
     "std",

@@ -1,6 +1,9 @@
 use anyhow::anyhow;
+#[cfg(feature = "barvinok")]
 use barvinok::ContextRef as BContext;
+#[cfg(feature = "barvinok")]
 use barvinok::constraint::Constraint;
+#[cfg(feature = "barvinok")]
 use barvinok::local_space::LocalSpace;
 use melior::Context as MContext;
 use melior::ir::{BlockLike, Module, OperationRef, RegionLike, operation::OperationLike};
@@ -11,6 +14,7 @@ use raffine::{DominanceInfo, tree::Tree};
 use std::num::NonZero;
 use std::{collections::HashMap, io::Read, path::PathBuf};
 use tracing::{debug, error, info};
+#[cfg(feature = "barvinok")]
 mod isl;
 mod salt;
 mod utils;
@@ -18,7 +22,10 @@ mod utils;
 use utils::create_table;
 struct AnalysisContext<'a> {
     rcontext: RContext,
+    #[cfg(feature = "barvinok")]
     bcontext: BContext<'a>,
+    #[cfg(not(feature = "barvinok"))]
+    _marker: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a> AnalysisContext<'a>
@@ -30,11 +37,23 @@ where
         F: for<'x> FnOnce(AnalysisContext<'x>) -> R,
     {
         let rcontext = RContext::new();
-        barvinok::Context::new().scope(move |bcontext| {
-            let context = AnalysisContext { rcontext, bcontext };
+        #[cfg(feature = "barvinok")]
+        {
+            barvinok::Context::new().scope(move |bcontext| {
+                let context = AnalysisContext { rcontext, bcontext };
+                f(context)
+            })
+        }
+        #[cfg(not(feature = "barvinok"))]
+        {
+            let context = AnalysisContext {
+                rcontext,
+                _marker: std::marker::PhantomData,
+            };
             f(context)
-        })
+        }
     }
+    #[cfg(feature = "barvinok")]
     fn start_with_args<S: AsRef<str>, F, R>(args: &[S], f: F) -> anyhow::Result<R>
     where
         F: for<'x> FnOnce(AnalysisContext<'x>) -> anyhow::Result<R>,
@@ -50,6 +69,7 @@ where
     fn rcontext(&self) -> &RContext {
         &self.rcontext
     }
+    #[cfg(feature = "barvinok")]
     fn bcontext(&self) -> BContext<'a> {
         self.bcontext
     }
@@ -61,6 +81,7 @@ where
 #[derive(Debug, Subcommand)]
 enum Method {
     /// Use the Barvinok library to compute the polyhedral model
+    #[cfg(feature = "barvinok")]
     Barvinok {
         #[arg(short = 'B', long)]
         /// barvinok options
@@ -241,6 +262,7 @@ fn main_entry() -> anyhow::Result<()> {
     let start_time = std::time::Instant::now();
 
     match &options.method {
+        #[cfg(feature = "barvinok")]
         Method::Barvinok {
             barvinok_arg,
             block_size,

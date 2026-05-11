@@ -1,5 +1,4 @@
 {
-    "python-envs.pythonProjects": [],
     "editor.formatOnSave": true,
     "files.insertFinalNewline": true,
     "rust-analyzer.cargo.extraEnv": {
@@ -46,4 +45,6 @@
         "-I/usr/lib64/llvm21/include",
     ],
     "clangd.path": "clangd-21",
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
 }

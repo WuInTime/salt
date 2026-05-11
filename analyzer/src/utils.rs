@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::Result;
 use raffine::affine::AffineExpr;
 use raffine::affine::AffineMap;

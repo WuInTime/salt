@@ -30,6 +30,11 @@ cargo run --bin analyzer -- --help
     # cargo run -r --bin analyzer -- -i analyzer/misc/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
     # cargo run --bin analyzer -- -i analyzer/misc/sym_test.mlir -m test.svg --json salt --block-size=8
 
+    Use the following to run without barvinok
+    cargo run -r --no-default-features --bin analyzer -- -i analyzer/misc/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
+
+    This is faster: 
+
 (Tip: To make this permanent, you can copy all those export lines into your ~/.bashrc file so they are loaded automatically every time you open a terminal).
 
 

@@ -13,7 +13,7 @@ members = [
 
 [profile.release]
 #lto = "thin"
-debug = true
+debug = false
 opt-level = 3
 
 [profile.wasm-release]
