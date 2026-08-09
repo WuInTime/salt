@@ -13,7 +13,7 @@ results/
 
 # Added by cargo
 
-/target
+target
 Cargo.lock
 perf.data*
 flamegraph.svg

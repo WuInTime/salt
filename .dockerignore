@@ -1,0 +1,60 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Secret & environment files (CRITICAL)
+.env
+.envrc
+*.pem
+*.key
+
+# Build artifacts & dependencies
+target/
+**/target/
+
+# Local data, cache, & output directories
+data/
+results/
+*.log
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+some_notes.txt
+
+############ From gitignore **********
+.idea/
+.cache/
+.envrc
+/cmake-build-*
+build
+.clangd
+data/
+data.tar.zst
+*.tar.zst
+results/
+/run*
+/fix*
+
+# Added by cargo
+target
+perf.data*
+flamegraph.svg
+*.sqlite
+*.sqlite*
+*.sqlite-journal
+/*.db
+*.db-journal
+*.log
+/*.png
+/*.svg
+result.txt
+.codex
