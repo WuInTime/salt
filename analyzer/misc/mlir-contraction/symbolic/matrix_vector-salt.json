@@ -1,0 +1,23 @@
+{
+  "ri_values": [
+    "-3 s1+3 s0 s1-21",
+    "-24 s1+3 s0 s1+3",
+    "3",
+    "3 s1-21"
+  ],
+  "portions": [
+    "\\frac{1}{24}",
+    "\\frac{1}{24} \\frac{1}{s1}",
+    "\\frac{1}{24} \\frac{1}{s1} \\left(22 s1-1\\right)",
+    "\\frac{1}{24}"
+  ],
+  "total_count": "3 s0 s1",
+  "miss_ratio_curve": {
+    "miss_ratio": [],
+    "turning_points": []
+  },
+  "analysis_time": {
+    "secs": 0,
+    "nanos": 5266832
+  }
+}

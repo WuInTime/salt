@@ -1,0 +1,21 @@
+{
+  "ri_values": [
+    "-2 s3+2 s0 s1 s2 s3-14",
+    "-16 s3+2 s0 s1 s2 s3+2",
+    "2"
+  ],
+  "portions": [
+    "\\frac{1}{16}",
+    "\\frac{1}{16} \\frac{1}{s3}",
+    "\\frac{1}{16} \\frac{1}{s3} \\left(15 s3-1\\right)"
+  ],
+  "total_count": "2 s0 s1 s2 s3",
+  "miss_ratio_curve": {
+    "miss_ratio": [],
+    "turning_points": []
+  },
+  "analysis_time": {
+    "secs": 0,
+    "nanos": 5421567
+  }
+}

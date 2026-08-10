@@ -17,6 +17,7 @@ target/
 data/
 results/
 *.log
+.backup
 
 # IDE & Editor files
 .vscode/

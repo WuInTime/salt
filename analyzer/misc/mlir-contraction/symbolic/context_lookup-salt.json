@@ -1,0 +1,29 @@
+{
+  "ri_values": [
+    "3 s4",
+    "3",
+    "3 s4-21",
+    "-21 s4+3 s3 s4-3 s2 s3 s4+3 s0 s1 s2 s3 s4",
+    "-21 s4+3 s3 s4",
+    "3 s4-3 s3 s4+3 s0 s1 s2 s3 s4-21",
+    "-24 s4+3 s0 s1 s2 s3 s4+3"
+  ],
+  "portions": [
+    "\\frac{7}{24}",
+    "\\frac{1}{24} \\frac{1}{s4} \\left(15 s4-1\\right)",
+    "\\frac{1}{24} \\frac{1}{s3} \\left(s3-1\\right)",
+    "\\frac{1}{24} \\frac{1}{s2}",
+    "\\frac{1}{24} \\frac{1}{s2} \\left(s2-1\\right)",
+    "\\frac{1}{24} \\frac{1}{s3}",
+    "\\frac{1}{24} \\frac{1}{s4}"
+  ],
+  "total_count": "3 s0 s1 s2 s3 s4",
+  "miss_ratio_curve": {
+    "miss_ratio": [],
+    "turning_points": []
+  },
+  "analysis_time": {
+    "secs": 0,
+    "nanos": 5439938
+  }
+}
