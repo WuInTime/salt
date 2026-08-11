@@ -415,7 +415,10 @@ fn main_entry() -> anyhow::Result<()> {
             //  utils::walk_tree_print_converted_affine_map(tree, 0)?;
             let mut rf = HashMap::new();
             let mut tc = HashMap::new();
-            let ri_dist = salt::get_reuse_interval_distribution(tree, &mut rf, &mut tc, 1, context);
+            let (ri_dist, curve_adjustments) =
+                salt::get_reuse_interval_distribution_with_adjustments(
+                    tree, &mut rf, &mut tc, 1, context,
+                );
             let ri_dist_vec = ri_dist
                 .iter()
                 .map(|(interval, portion)| (interval.clone(), portion.clone()));
@@ -430,16 +433,34 @@ fn main_entry() -> anyhow::Result<()> {
                     .collect::<Vec<_>>(),
                 None => ri_dist_vec.collect::<Vec<_>>(),
             };
+            let curve_adjustments = match block_size {
+                Some(block_size) => curve_adjustments
+                    .iter()
+                    .map(|(interval, adjustment)| {
+                        (
+                            salt::substitute_block_size(interval, *block_size),
+                            salt::substitute_block_size(adjustment, *block_size),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+                None => curve_adjustments,
+            };
             if options.json {
-                let output =
-                    salt::create_json_output(&ri_dist_vec, access_cnt, tc.values(), start_time)?;
+                let output = salt::create_json_output(
+                    &ri_dist_vec,
+                    &curve_adjustments,
+                    access_cnt,
+                    tc.values(),
+                    start_time,
+                )?;
                 writeln!(writer, "{output}")?;
             } else {
                 let table = create_table(&ri_dist_vec);
                 writeln!(writer, "{table}")?;
                 let total_count = salt::get_total_count(access_cnt, tc.values());
                 writeln!(writer, "Total: {total_count}")?;
-                let distribution = salt::get_ri_distribution(&ri_dist_vec);
+                let distribution =
+                    salt::get_adjusted_ri_distribution(&ri_dist_vec, &curve_adjustments);
                 let mut curve = denning::MissRatioCurve::new(&distribution);
                 // Apply associativity only when it is greater than one.
                 if options.associativity.get() > 1 {

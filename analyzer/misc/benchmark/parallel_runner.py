@@ -9,6 +9,24 @@ import json
 import time
 from concurrent.futures import ProcessPoolExecutor
 
+
+def geometric_blocks(max_cache, growth_factor):
+    """Return a sparse sweep combining geometric samples and powers of two."""
+    blocks = {2, max_cache}
+
+    value = 2
+    while value < max_cache:
+        blocks.add(value)
+        value = max(value + 1, int(value * growth_factor))
+
+    value = 2
+    while value < max_cache:
+        blocks.add(value)
+        value *= 2
+
+    return sorted(value for value in blocks if value <= max_cache)
+
+
 def execute(args):
     src, blocks, block_size = args
     with tempfile.TemporaryDirectory() as dir:
@@ -34,18 +52,34 @@ def main():
     parser.add_argument('--block', type=int, default=64, help='block size')
     parser.add_argument('--step', type=int, default=1, help='step size')
     parser.add_argument(
+        '--sampling', choices=('dense', 'geometric'), default='dense',
+        help='generate a dense or sparse geometric sweep (default: dense)',
+    )
+    parser.add_argument(
+        '--growth-factor', type=float, default=1.5,
+        help='growth factor for geometric sampling (default: 1.5)',
+    )
+    parser.add_argument(
         '--blocks', type=str,
-        help='comma-separated cache-block counts; overrides --max-cache and --step',
+        help='comma-separated cache-block counts; overrides generated sampling options',
     )
     parser.add_argument('--output', type=str, default='/tmp/miss_ratio.json', help='output file')
     args = parser.parse_args()
+    if args.max_cache < 2:
+        parser.error('--max-cache must be at least 2')
+    if args.step < 1:
+        parser.error('--step must be at least 1')
+    if args.growth_factor <= 1:
+        parser.error('--growth-factor must be greater than 1')
+
     src = os.path.abspath(args.src)
     all_task_args = []
-    blocks_to_run = (
-        [int(value) for value in args.blocks.split(',')]
-        if args.blocks
-        else list(range(2, args.max_cache + 1, args.step))
-    )
+    if args.blocks:
+        blocks_to_run = [int(value) for value in args.blocks.split(',')]
+    elif args.sampling == 'geometric':
+        blocks_to_run = geometric_blocks(args.max_cache, args.growth_factor)
+    else:
+        blocks_to_run = list(range(2, args.max_cache + 1, args.step))
     for blocks in blocks_to_run:
         all_task_args.append((src, blocks, args.block))
     start_time = time.time()

@@ -5,8 +5,6 @@ members = [
     "analyzer",
     "denning",
     "cachegrind-runner",
-    "mrc",
-    "assoc-conv",
 ]
 
 [profile.release]

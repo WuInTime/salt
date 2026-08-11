@@ -159,12 +159,52 @@ pub fn number_of_accesses(tree: &Tree) -> usize {
 }
 
 /// Computes the reuse-interval distribution for an unblocked loop tree.
+#[allow(dead_code, reason = "keeps the distribution-only SALT API available")]
 pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
     tree: &Tree<'a>,
     reuse_factors: &mut HashMap<usize, Poly>,
     trip_counts: &mut HashMap<usize, Poly>,
     ref_count: usize,
     context: &AnalysisContext<'b>,
+) -> HashMap<Poly, Poly> {
+    get_reuse_interval_distribution_impl(
+        tree,
+        reuse_factors,
+        trip_counts,
+        ref_count,
+        context,
+        &mut Vec::new(),
+    )
+}
+
+/// Computes the reuse-interval distribution and the per-reference corrections needed by its
+/// miss-ratio curve.
+pub fn get_reuse_interval_distribution_with_adjustments<'a, 'b: 'a>(
+    tree: &Tree<'a>,
+    reuse_factors: &mut HashMap<usize, Poly>,
+    trip_counts: &mut HashMap<usize, Poly>,
+    ref_count: usize,
+    context: &AnalysisContext<'b>,
+) -> (HashMap<Poly, Poly>, Vec<(Poly, Poly)>) {
+    let mut adjustments = Vec::new();
+    let distribution = get_reuse_interval_distribution_impl(
+        tree,
+        reuse_factors,
+        trip_counts,
+        ref_count,
+        context,
+        &mut adjustments,
+    );
+    (distribution, adjustments)
+}
+
+fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
+    tree: &Tree<'a>,
+    reuse_factors: &mut HashMap<usize, Poly>,
+    trip_counts: &mut HashMap<usize, Poly>,
+    ref_count: usize,
+    context: &AnalysisContext<'b>,
+    curve_adjustments: &mut Vec<(Poly, Poly)>,
 ) -> HashMap<Poly, Poly> {
     match tree {
         Tree::For {
@@ -203,17 +243,25 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
             reuse_factors.insert(*id, constant_poly(1, context));
             trip_counts.insert(*id, trip_count.clone());
 
-            get_reuse_interval_distribution(body, reuse_factors, trip_counts, ref_count, context)
+            get_reuse_interval_distribution_impl(
+                body,
+                reuse_factors,
+                trip_counts,
+                ref_count,
+                context,
+                curve_adjustments,
+            )
         }
         Tree::Block(trees) => {
             let mut ri_dist: HashMap<Poly, Poly> = HashMap::new();
             for subtree in trees.iter() {
-                let subtree_distribution = get_reuse_interval_distribution(
+                let subtree_distribution = get_reuse_interval_distribution_impl(
                     subtree,
                     reuse_factors,
                     trip_counts,
                     trees.len(),
                     context,
+                    curve_adjustments,
                 );
                 for (interval, portion) in subtree_distribution {
                     ri_dist
@@ -227,7 +275,7 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
         Tree::Access { map, operands, .. } => {
             let field = RationalPolynomialField::new(IntegerRing);
 
-            // Record the loop dimensions used by this access and their trip-count product.
+            // Record the loop dimensions used by this access.
             let mut reference_vector = vec![0; reuse_factors.len()];
             let mut block_position = 0;
             let mut referenced_trip_product = constant_poly(1, context);
@@ -320,6 +368,16 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
             let block_atom = Atom::var(symbol!("b"));
             let block_poly =
                 block_atom.to_rational_polynomial(&IntegerRing::new(), &IntegerRing::new(), None);
+            // The first nonzero reference-vector boundary represents one imaginary final reuse.
+            // Normalize its referenced trip-count product by all accesses, the number of
+            // references, and the block size to obtain this reference's curve adjustment.
+            let curve_adjustment = field.div(
+                &field.div(
+                    &field.div(&referenced_trip_product, &total_access),
+                    &reference_count,
+                ),
+                &block_poly,
+            );
             let mut reuse_intervals: Vec<(Poly, usize)> = vec![];
 
             let mut block_interval = constant_poly(-1, context);
@@ -364,6 +422,10 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
 
             reuse_intervals.reverse();
 
+            if let Some((highest_interval, _)) = reuse_intervals.first() {
+                curve_adjustments.push((highest_interval.clone(), curve_adjustment));
+            }
+
             let mut ri_dist: HashMap<Poly, Poly> = HashMap::new();
 
             let mut previous_portion = constant_poly(0, context);
@@ -386,13 +448,6 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
                     previous_portion = portion_factor;
                 } else {
                     saw_first_interval = true;
-                    let imaginary_portion = field.div(
-                        &field.div(
-                            &field.div(&referenced_trip_product, &total_access),
-                            &reference_count,
-                        ),
-                        &block_poly,
-                    );
                     if *position < block_position {
                         let without_block = &portion_factor - &previous_portion;
                         let with_block = field.div(&without_block, &block_poly);
@@ -404,7 +459,7 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
                         }
                     } else {
                         let portion = &portion_factor - &previous_portion;
-                        let portion = &field.div(&portion, &reference_count) - &imaginary_portion;
+                        let portion = field.div(&portion, &reference_count);
                         if portion != constant_poly(0, context) {
                             ri_dist.insert(interval.clone(), portion);
                         }
@@ -448,7 +503,18 @@ where
 /// Converts the numeric portion of a symbolic distribution into curve input.
 ///
 /// Entries that still contain symbolic values are omitted.
+#[allow(dead_code, reason = "keeps the unadjusted conversion API available")]
 pub fn get_ri_distribution(dist: &[(Poly, Poly)]) -> Vec<(isize, f64)> {
+    get_adjusted_ri_distribution(dist, &[])
+}
+
+/// Converts a symbolic distribution into curve input and subtracts each reference's adjustment
+/// from the portion at that reference's highest reuse interval. `MissRatioCurve::new` turns that
+/// subtraction into an addition at that row and every following row.
+pub fn get_adjusted_ri_distribution(
+    dist: &[(Poly, Poly)],
+    adjustments: &[(Poly, Poly)],
+) -> Vec<(isize, f64)> {
     let mut distro_map = AHashMap::new();
     let empty_const_map = AHashMap::<Atom, _>::new();
     let empty_symbol_map = AHashMap::new();
@@ -475,6 +541,29 @@ pub fn get_ri_distribution(dist: &[(Poly, Poly)]) -> Vec<(isize, f64)> {
             .and_modify(|total| *total += portion)
             .or_insert(portion);
     }
+
+    for (value, adjustment) in adjustments {
+        let Ok(value) =
+            value
+                .to_expression()
+                .evaluate(|x| x.to_f64(), &empty_const_map, &empty_symbol_map)
+        else {
+            continue;
+        };
+        let Ok(adjustment) = adjustment.to_expression().evaluate(
+            |x| x.to_f64(),
+            &empty_const_map,
+            &empty_symbol_map,
+        ) else {
+            continue;
+        };
+        let value = value as isize;
+        distro_map
+            .entry(value)
+            .and_modify(|portion| *portion -= adjustment)
+            .or_insert(-adjustment);
+    }
+
     if !saw_numeric_value {
         return Vec::new();
     }
@@ -506,6 +595,7 @@ pub fn substitute_block_size(poly: &Poly, block_size: usize) -> Poly {
 /// Serializes the symbolic distribution and its derived miss-ratio curve.
 pub fn create_json_output<'a, I>(
     dist: &[(Poly, Poly)],
+    adjustments: &[(Poly, Poly)],
     accesses: usize,
     trip_counts: I,
     start_time: Instant,
@@ -535,7 +625,7 @@ where
         .to_expression()
         .printer(PrintOptions::file_no_namespace())
         .to_string();
-    let distribution = get_ri_distribution(dist).into_boxed_slice();
+    let distribution = get_adjusted_ri_distribution(dist, adjustments).into_boxed_slice();
     let miss_ratio_curve = MissRatioCurve::new(&distribution);
     let analysis_time = start_time.elapsed();
     let result = SaltResult {
@@ -561,6 +651,20 @@ mod tests {
             operands,
             is_write: false,
         }
+    }
+
+    fn ratio(numerator: isize, denominator: isize, context: &AnalysisContext<'_>) -> Poly {
+        RationalPolynomialField::new(IntegerRing).div(
+            &constant_poly(numerator, context),
+            &constant_poly(denominator, context),
+        )
+    }
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-12,
+            "expected {expected}, got {actual}"
+        );
     }
 
     #[test]
@@ -643,5 +747,83 @@ mod tests {
 
         assert!(is_perfectly_nested(&access_block));
         assert!(!is_perfectly_nested(&empty_block));
+    }
+
+    #[test]
+    fn curve_adjustments_accumulate_at_tied_highest_intervals() {
+        AnalysisContext::start(|context| {
+            let dist = vec![
+                (constant_poly(3, &context), ratio(1, 5, &context)),
+                (constant_poly(4, &context), ratio(3, 10, &context)),
+                (constant_poly(5, &context), ratio(1, 2, &context)),
+            ];
+            let adjustments = vec![
+                (constant_poly(3, &context), ratio(1, 10, &context)),
+                (constant_poly(4, &context), ratio(1, 20, &context)),
+                (constant_poly(4, &context), ratio(1, 20, &context)),
+            ];
+
+            let distribution = get_adjusted_ri_distribution(&dist, &adjustments);
+            let curve = MissRatioCurve::new(&distribution);
+            let json = serde_json::to_value(curve).expect("the curve must serialize");
+            let miss_ratio = json["miss_ratio"]
+                .as_array()
+                .expect("miss_ratio must be an array");
+
+            // Relative to the unadjusted curve, row 3 gains 0.1. Rows 4 and 5 gain
+            // that same 0.1 plus both tied 0.05 adjustments.
+            assert_close(miss_ratio[1].as_f64().unwrap(), 0.9);
+            assert_close(miss_ratio[2].as_f64().unwrap(), 0.7);
+            assert_close(miss_ratio[3].as_f64().unwrap(), 0.2);
+        });
+    }
+
+    #[test]
+    fn reference_adjustment_is_normalized_by_unreferenced_trip_counts() {
+        AnalysisContext::start(|context| {
+            let mlir_context = context.mcontext();
+            let inner_operands = [ValID::IVar(1)];
+            let inner_access = access(
+                AffineMap::new(mlir_context, 1, 0, &[AffineExpr::new_dim(mlir_context, 0)]),
+                &inner_operands,
+            );
+            let inner_loop = Tree::For {
+                lower_bound: AffineMap::new_constant(mlir_context, 0),
+                upper_bound: AffineMap::new_constant(mlir_context, 5),
+                lower_bound_operands: &[],
+                upper_bound_operands: &[],
+                step: 1,
+                ivar: ValID::IVar(1),
+                body: &inner_access,
+            };
+            let tree = Tree::For {
+                lower_bound: AffineMap::new_constant(mlir_context, 0),
+                upper_bound: AffineMap::new_constant(mlir_context, 7),
+                lower_bound_operands: &[],
+                upper_bound_operands: &[],
+                step: 1,
+                ivar: ValID::IVar(0),
+                body: &inner_loop,
+            };
+            let mut reuse_factors = HashMap::new();
+            let mut trip_counts = HashMap::new();
+
+            let (_, adjustments) = get_reuse_interval_distribution_with_adjustments(
+                &tree,
+                &mut reuse_factors,
+                &mut trip_counts,
+                1,
+                &context,
+            );
+            assert_eq!(adjustments.len(), 1);
+            let adjustment = substitute_block_size(&adjustments[0].1, 1);
+            let empty_const_map = AHashMap::<Atom, f64>::new();
+            let empty_symbol_map = AHashMap::new();
+            let adjustment = adjustment
+                .to_expression()
+                .evaluate(|value| value.to_f64(), &empty_const_map, &empty_symbol_map)
+                .expect("the adjustment must be numeric");
+            assert_close(adjustment, 1.0 / 7.0);
+        });
     }
 }

@@ -656,7 +656,7 @@ fn main() {
             let block_size = args.d1_block_size;
             let cache_size = args.d1_cache_size;
             (block_size..=cache_size)
-                .step_by(block_size * 4)
+                .step_by(block_size * 256)
                 // TODO: Need to delete * 64 when submitting AE. this is a temporary hack to reduce the number of runs for testing.
                 .collect::<Vec<_>>()
         }

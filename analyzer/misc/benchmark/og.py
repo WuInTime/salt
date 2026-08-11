@@ -73,10 +73,10 @@ if __name__ == '__main__':
 # python3 parallel_runner.py --src matmul-t2.c --output tmp/mr_t2.json --max-cache 8192 --block 64;
 
 
-\subsubsection{Accuracy}
+# \subsubsection{Accuracy}
 
-Fig.~3 compares SALT’s miss-ratio curves with Cachegrind.  
-Although the figure shows a sampled subset of cache sizes for readability, we compute the accuracy metrics over the full sweep from 2 to 1024 blocks (1022 data points per kernel and tiling configuration).  
-Across all three kernels, SALT reconstructs both the plateau levels and the sharp drops associated with reuse-distance thresholds.  
-Using the complete data set, the mean absolute percentage error (MAPE) stays below 15\% and the mean squared error (MSE) remains below $6.4\times10^{-4}$, demonstrating close agreement in both the relative and absolute shape of the miss-ratio curves.  
-These results confirm that SALT captures the full piecewise structure of miss behavior across the entire cache-size range.
+# Fig.~3 compares SALT’s miss-ratio curves with Cachegrind.  
+# Although the figure shows a sampled subset of cache sizes for readability, we compute the accuracy metrics over the full sweep from 2 to 1024 blocks (1022 data points per kernel and tiling configuration).  
+# Across all three kernels, SALT reconstructs both the plateau levels and the sharp drops associated with reuse-distance thresholds.  
+# Using the complete data set, the mean absolute percentage error (MAPE) stays below 15\% and the mean squared error (MSE) remains below $6.4\times10^{-4}$, demonstrating close agreement in both the relative and absolute shape of the miss-ratio curves.  
+# These results confirm that SALT captures the full piecewise structure of miss behavior across the entire cache-size range.

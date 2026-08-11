@@ -181,7 +181,7 @@ def run(svg_output, data_dir):
             else:
                 mape = float('nan')
         
-        print(f'{group["label"]} - MAPE: {mape:.2f}%, MSE: {mse:.2e}')
+        # print(f'{group["label"]} - MAPE: {mape:.2f}%, MSE: {mse:.2e}')
 
         # Plot cachegrind simulation
         if matmul_blocks.size > 0:
@@ -227,9 +227,9 @@ def run(svg_output, data_dir):
     plt.yscale('log')
 
     x_min = 1.5e0
-    x_max = 2.5e4
+    x_max = 3e4
     plt.xlim(left=x_min, right=x_max)
-    autoscale_visible_log_y(plt.gca(), x_min, x_max)
+    # autoscale_visible_log_y(plt.gca(), x_min, x_max)
 
     # Increase tick label sizes for better readability
     plt.tick_params(axis='both', which='major', labelsize=20)
