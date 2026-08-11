@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+export SYMBOLICA_HIDE_BANNER=${SYMBOLICA_HIDE_BANNER:-1}
+
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 contraction_root="$repository_root/benchmarks/mlir-contractions"
 constant_dir="$contraction_root/constant"

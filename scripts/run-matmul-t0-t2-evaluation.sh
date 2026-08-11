@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+export SYMBOLICA_HIDE_BANNER=${SYMBOLICA_HIDE_BANNER:-1}
+
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 benchmark_dir="$repository_root/benchmarks/matmul-t0-t2"
 example_dir="$repository_root/benchmarks/examples"
