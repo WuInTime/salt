@@ -3,10 +3,10 @@
 set -euo pipefail
 
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-benchmark_dir="$repository_root/analyzer/misc/benchmark"
-misc_dir="$repository_root/analyzer/misc"
-results_dir=${RESULTS_DIR:-"$benchmark_dir/results/matmul-t0-t2"}
-max_cache_blocks=${MAX_CACHE_BLOCKS:-65536}
+benchmark_dir="$repository_root/benchmarks/matmul-t0-t2"
+example_dir="$repository_root/benchmarks/examples"
+results_dir=${RESULTS_DIR:-"$repository_root/results/matmul-t0-t2"}
+max_cache_blocks=${MAX_CACHE_BLOCKS:-32768}
 cache_step=${CACHE_STEP:-1}
 cache_sampling=${CACHE_SAMPLING:-geometric}
 cache_growth_factor=${CACHE_GROWTH_FACTOR:-1.5}
@@ -29,7 +29,7 @@ for index in "${!sources[@]}"; do
 
     echo "Generating SALT result for $source_name..."
     "$analyzer" \
-        -i "$misc_dir/$mlir_name.mlir" \
+        -i "$example_dir/$mlir_name.mlir" \
         --json \
         -o "$results_dir/$source_name-salt.json" \
         salt \

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DATA_DIR = REPOSITORY_ROOT / 'analyzer' / 'misc' / 'benchmark' / 'results' / 'matmul-t0-t2'
+DEFAULT_DATA_DIR = REPOSITORY_ROOT / 'results' / 'matmul-t0-t2'
 
 # Set the plot style to ggplot
 plt.style.use('ggplot')

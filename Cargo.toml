@@ -1,10 +1,10 @@
 [workspace]
 resolver = "3"
 members = [
-    "raffine",
     "analyzer",
-    "denning",
     "cachegrind-runner",
+    "denning",
+    "raffine",
 ]
 
 [profile.release]

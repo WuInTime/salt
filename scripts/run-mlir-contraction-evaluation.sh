@@ -5,10 +5,10 @@
 set -euo pipefail
 
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-contraction_root="$repository_root/analyzer/misc/mlir-contraction"
+contraction_root="$repository_root/benchmarks/mlir-contractions"
 constant_dir="$contraction_root/constant"
 source_tiled_dir="$constant_dir/tiled"
-results_dir=${RESULTS_DIR:-"$contraction_root/results"}
+results_dir=${RESULTS_DIR:-"$repository_root/results/mlir-contractions"}
 work_dir="$results_dir/work"
 staged_constant_dir="$work_dir/constant"
 tiled_dir="$staged_constant_dir/tiled"
@@ -152,7 +152,7 @@ done
 
 echo "Generating log- and linear-scale figures..."
 MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/autolala-matplotlib} \
-python3 "$repository_root/scripts/graph.py" \
+python3 "$repository_root/scripts/graph_contractions_salt_vs_cg.py" \
     --fully-db "$fully_db" \
     --8way-db "$way8_db" \
     --12way-db "$way12_db" \

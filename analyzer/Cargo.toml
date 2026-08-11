@@ -18,7 +18,7 @@ tracing = { version = "0.1", default-features = false, features = [
     "max_level_trace",
     "release_max_level_info",
 ] }
-palc = { git = "https://github.com/oxalica/palc" }
+palc = { git = "https://github.com/oxalica/palc", rev = "ac90678283c5e4fde4d99bb914eb1ded35a52133" }
 melior = { version = "0.26.9" }
 anyhow = { version = "1.0.98", features = ["backtrace"] }
 symbolica = { version = "1.5.1", default-features = false }

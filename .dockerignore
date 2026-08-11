@@ -38,8 +38,6 @@ some_notes.txt
 /cmake-build-*
 build
 .clangd
-data/
-data.tar.zst
 *.tar.zst
 results/
 /run*

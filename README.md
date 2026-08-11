@@ -61,9 +61,9 @@ Notes:
 cargo run -r -b analyzer -- -i /path/to/input.mlir --json -o /path/to/output.json salt --block-size 8
 ```
 
-cargo run -r -b analyzer -- -i analyzer/misc/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
+cargo run -r -b analyzer -- -i benchmarks/examples/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
 
-target/release/analyzer -i analyzer/misc/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
+target/release/analyzer -i benchmarks/examples/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
 
 
 ## Recommended development setup (for VSCode)

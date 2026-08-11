@@ -14,7 +14,8 @@ from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-CONTRACTION_ROOT = REPOSITORY_ROOT / "analyzer" / "misc" / "mlir-contraction"
+CONTRACTION_ROOT = REPOSITORY_ROOT / "benchmarks" / "mlir-contractions"
+DEFAULT_RESULTS_DIR = REPOSITORY_ROOT / "results" / "mlir-contractions"
 KERNELS = {
     "3D Tensor Vector": "3d_tensor_vector",
     "4D Tensor": "4d_tensor",
@@ -57,7 +58,7 @@ def main():
     parser.add_argument(
         "--out",
         type=Path,
-        default=CONTRACTION_ROOT / "timing-selected.json",
+        default=DEFAULT_RESULTS_DIR / "timing-selected.json",
         help="output timing manifest",
     )
     parser.add_argument("--repetitions", type=int, default=1)
