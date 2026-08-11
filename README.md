@@ -19,13 +19,74 @@ Generated results and Cargo build products are intentionally excluded from
 version control. Each workflow can write somewhere else by setting
 `RESULTS_DIR`.
 
+## Recommended Docker workflow
+
+Docker is the recommended evaluator path. The image uses Ubuntu 24.04, the
+official LLVM/MLIR 21 packages, the pinned Rust toolchain and the Python
+versions in `requirements.txt`.
+
+Build the image from the repository root:
+
+```bash
+docker build --progress=plain \
+  --build-arg ARTIFACT_REVISION="$(git rev-parse HEAD)" \
+  -t autolala-artifact:ae .
+```
+
+Use `--no-cache` once before submission to verify a completely clean build.
+
+Check the toolchain and run the Rust test suite:
+
+```bash
+docker run --rm autolala-artifact:ae test
+```
+
+The `test` command isolates analyzer unit tests into separate processes so the
+suite also works with Symbolica's free restricted mode.
+
+Run both reduced evaluation workflows and retain their results on the host:
+
+```bash
+mkdir artifact-results
+docker run --rm --init \
+  -v "$PWD/artifact-results:/artifact/results" \
+  autolala-artifact:ae smoke
+```
+
+The mounted directory must not already contain `contraction-smoke/` or
+`matmul-smoke/`; this prevents results from different runs from being mixed.
+
+After validating the smoke run, start the complete evaluation with an empty
+directory:
+
+```bash
+mkdir full-results
+docker run --rm --init \
+  -v "$PWD/full-results:/artifact/results" \
+  autolala-artifact:ae reproduce
+```
+
+If a separately obtained Symbolica license is required, pass the existing
+shell variable at runtime rather than storing it in the image:
+
+```bash
+docker run --rm --init \
+  -e SYMBOLICA_LICENSE \
+  -v "$PWD/artifact-results:/artifact/results" \
+  autolala-artifact:ae smoke
+```
+
+The container records its tool versions in `environment-smoke.txt` or
+`environment-full.txt` alongside the results. Run `docker run --rm
+autolala-artifact:ae help` for all container commands.
+
 ## Requirements
 
 The direct, non-containerized workflow requires:
 
 - Linux on an x86-64 machine;
 - Rustup and Cargo (the pinned toolchain is in `rust-toolchain`);
-- LLVM/MLIR 21 development libraries and tools;
+- LLVM/MLIR 21 development libraries and tools, including Polly;
 - Clang/Clang++ 21, LLD, GCC/G++, and a C/C++ build toolchain;
 - CMake, Autoconf, Automake, Libtool, and `pkg-config`;
 - GMP and NTL development libraries;
@@ -55,6 +116,10 @@ python3 -m pip install -r requirements.txt
 
 Cargo commands use the committed `Cargo.lock` and pass `--locked`. The first
 build downloads Rust dependencies and can take several minutes.
+
+The Docker image also installs the pinned toolchain's `rustfmt` component.
+This is required by the pinned Barvinok binding generator, not only for source
+formatting.
 
 ## Symbolica
 

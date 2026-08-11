@@ -16,6 +16,8 @@ target/
 # Local data, cache, & output directories
 data/
 results/
+artifact-results/
+full-results/
 *.log
 .backup
 
@@ -58,3 +60,4 @@ flamegraph.svg
 result.txt
 .codex
 some_notes.txt
+results.old/

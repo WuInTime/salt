@@ -9,6 +9,8 @@ data.tar.zst
 *.tar.zst
 results/
 results.old/
+artifact-results/
+full-results/
 /run*
 /fix*
 

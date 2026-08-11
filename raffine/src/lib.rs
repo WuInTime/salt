@@ -59,8 +59,8 @@ impl Context {
 
 #[cfg(test)]
 mod tests {
-    use melior::ir::{BlockLike, Module, RegionLike};
     use melior::ir::operation::OperationLike;
+    use melior::ir::{BlockLike, Module, RegionLike};
 
     #[test]
     fn mlir_loads_affine_dialect() {
