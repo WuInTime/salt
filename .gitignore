@@ -27,3 +27,4 @@ flamegraph.svg
 /*.svg
 result.txt
 .codex
+analyzer/misc/mlir-contraction/results.old

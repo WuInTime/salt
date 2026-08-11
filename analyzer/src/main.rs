@@ -410,36 +410,21 @@ fn main_entry() -> anyhow::Result<()> {
 
             debug!("Extracted tree: {}", tree);
 
-            // if !is_perfectly_nested(tree) {
-            //     return Err(anyhow!("The loop nest is not perfectly nested"));
-            // }
-
-            // if !has_reuses(tree) {
-            //     return Err(anyhow!(
-            //         "The loop nest does not have non-imaginary non-block-wise reuses"
-            //     ));
-            // }
-
-            // if !no_coefficient_for_block(tree) {
-            //     return Err(anyhow!(
-            //         "The loop nest has non-one coefficient for block induction variable"
-            //     ));
-            // }
-
             let access_cnt = salt::number_of_accesses(tree);
 
             //  utils::walk_tree_print_converted_affine_map(tree, 0)?;
             let mut rf = HashMap::new();
             let mut tc = HashMap::new();
             let ri_dist = salt::get_reuse_interval_distribution(tree, &mut rf, &mut tc, 1, context);
-            // hashmap to vector tuple
-            let ri_dist_vec = ri_dist.iter().map(|(k, v)| (k.clone(), v.clone()));
+            let ri_dist_vec = ri_dist
+                .iter()
+                .map(|(interval, portion)| (interval.clone(), portion.clone()));
 
             let ri_dist_vec = match block_size {
                 Some(block_size) => ri_dist_vec
                     .map(|(x, y)| {
-                        let x = salt::subsitute_block_size(&x, *block_size);
-                        let y = salt::subsitute_block_size(&y, *block_size);
+                        let x = salt::substitute_block_size(&x, *block_size);
+                        let y = salt::substitute_block_size(&y, *block_size);
                         (x, y)
                     })
                     .collect::<Vec<_>>(),
@@ -452,36 +437,30 @@ fn main_entry() -> anyhow::Result<()> {
             } else {
                 let table = create_table(&ri_dist_vec);
                 writeln!(writer, "{table}")?;
-                let total_count = salt::get_total_count(access_cnt, tc.values())?;
+                let total_count = salt::get_total_count(access_cnt, tc.values());
                 writeln!(writer, "Total: {total_count}")?;
-                match salt::get_ri_distro(&ri_dist_vec) {
-                    Ok(dist) => {
-                        let mut curve = denning::MissRatioCurve::new(&dist);
-                        // apply associativity only when it's greater than 1
-                        if options.associativity.get() > 1 {
-                            curve = curve.compute_assoc(
-                                options.associativity.get(),
-                                1.0,
-                                denning::SkewDecay::Constant,
-                            );
-                        }
+                let distribution = salt::get_ri_distribution(&ri_dist_vec);
+                let mut curve = denning::MissRatioCurve::new(&distribution);
+                // Apply associativity only when it is greater than one.
+                if options.associativity.get() > 1 {
+                    curve = curve.compute_assoc(
+                        options.associativity.get(),
+                        1.0,
+                        denning::SkewDecay::Constant,
+                    );
+                }
 
-                        if let Some(path) = &options.miss_ratio_curve {
-                            let svgbackend = plotters::backend::SVGBackend::new(
-                                path,
-                                (
-                                    options.miss_ratio_curve_width,
-                                    options.miss_ratio_curve_height,
-                                ),
-                            );
-                            let area = svgbackend.into_drawing_area();
-                            curve.plot_miss_ratio_curve(&area)?;
-                            info!("Miss ratio curve saved to {}", path.display());
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to get distribution: {}\n{}", e, e.backtrace());
-                    }
+                if let Some(path) = &options.miss_ratio_curve {
+                    let svgbackend = plotters::backend::SVGBackend::new(
+                        path,
+                        (
+                            options.miss_ratio_curve_width,
+                            options.miss_ratio_curve_height,
+                        ),
+                    );
+                    let area = svgbackend.into_drawing_area();
+                    curve.plot_miss_ratio_curve(&area)?;
+                    info!("Miss ratio curve saved to {}", path.display());
                 }
             }
             Ok(())

@@ -1,0 +1,153 @@
+python scripts/plot-miss-counts.py scripts/plot-settings.json
+
+
+python analyzer/misc/run-analyzer.py
+
+
+
+=====================================================
+The following is working:
+
+export INSTALL_PREFIX="${HOME}/.local/llvm-21-mlir"
+export PATH="$INSTALL_PREFIX/bin:$PATH"
+export MLIR_SYS_210_PREFIX=$INSTALL_PREFIX
+export TABLEGEN_210_PREFIX=$INSTALL_PREFIX
+export LIBCLANG_PATH="$INSTALL_PREFIX/lib"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib:$LD_LIBRARY_PATH"
+export BINDGEN_EXTRA_CLANG_ARGS="-I$INSTALL_PREFIX/lib/clang/21/include"
+
+cargo clean
+cargo run --bin analyzer -- --help
+
+
+
+    # For single run in terminal, use:
+    # cargo run -r --bin analyzer -- -i {file_path} -m test.svg --json barvinok --block-size=8 --barvinok-arg="--approximation-method={approximation_method}" --infinite-repeat
+
+    cargo run -r --bin analyzer -- -i analyzer/misc/sym_matmul_3acc.mlir -m test.svg --json barvinok --block-size=8 --barvinok-arg=--approximation-method=scale --infinite-repeat
+
+    
+    # or
+    # cargo run -r --bin analyzer -- -i analyzer/misc/tiled_matmul_once_tiled.mlir -m test.svg --json barvinok --block-size=8
+
+    # For single of salt in terminal, use:
+    # cargo run --bin analyzer -- -i analyzer/misc/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
+    # cargo run --bin analyzer -- -i analyzer/misc/sym_matmul_3acc.mlir -m test.svg --json salt --block-size=8
+
+    Use the following to run without barvinok
+    cargo run -r --no-default-features --bin analyzer -- -i analyzer/misc/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
+
+    This is faster: 
+
+(Tip: To make this permanent, you can copy all those export lines into your ~/.bashrc file so they are loaded automatically every time you open a terminal).
+
+
+Or you can append this into config.toml under .cargo directory at the root directory of this project: Seems to be not working
+[env]
+INSTALL_PREFIX = "/home/ywu/.local/llvm-21-mlir"
+# PATH = { value = "/home/ywu/.local/llvm-21-mlir/bin", force = false } # Cargo [env] cannot safely prepend PATH
+MLIR_SYS_210_PREFIX = "/home/ywu/.local/llvm-21-mlir"
+TABLEGEN_210_PREFIX = "/home/ywu/.local/llvm-21-mlir"
+LIBCLANG_PATH = "/home/ywu/.local/llvm-21-mlir/lib"
+BINDGEN_EXTRA_CLANG_ARGS = "-I/home/ywu/.local/llvm-21-mlir/lib/clang/21/include"
+
+
+
+
+The gmp-mpfr-sys crate provides Rust bindings for three C libraries: GMP, MPFR, and MPC.
+
+When the use-system-libs feature is enabled:
+
+The crate attempts to link dynamically to your operating system's installed versions of these libraries.
+For this to work on Fedora, you would need to have the development headers installed (e.g., gmp-devel, mpfr-devel, and libmpc-devel) because the Rust compiler needs them to generate the native bindings. If any of those are missing or the system library versions are incompatible with what the crate expects, the build process will throw an error (often complaining about missing MPC or MPFR).
+By removing use-system-libs (changing it to just "1.6.5"):
+
+You are telling the crate not to look for the system's C libraries.
+Instead, gmp-mpfr-sys will download the source code for GMP, MPFR, and MPC, and compile them locally as part of your Rust build process. It will then statically link these bundled, known-compatible versions directly into your application.
+This makes your build self-contained and isolated from your Linux distribution's specific package versions. I can see you just installed autoconf, automake, and libtool in your terminal—these are the exact build tools the crate needs to successfully compile those bundled C libraries from source in the background.
+
+sudo dnf install -y \
+  llvm-devel mlir-devel \
+  libxml2-devel \
+  fontconfig-devel pkgconf-pkg-config \
+  gmp-devel mpfr-devel libmpc-devel \
+  autoconf automake libtool \
+  ntl-devel
+
+
+The reason you need the operation::OperationLike import now is because the melior dependency was upgraded.
+
+According to the output from git diff HEAD~1 analyzer/Cargo.toml, your project recently changed the melior dependency version from "0.24.0" to "0.26.9".
+
+In older versions of melior (like 0.24.0), OperationRef and similar struct types directly implemented those methods. However, in newer versions of the crate (starting around v0.25.0+), the developers of melior refactored the API and moved many core operation utilities into the generic OperationLike trait. This forces consumers of the API to explicitly import the trait in order to access methods like .name(), .attribute(), and .next_in_block() on the operation types.
+
+Because the underlying API architecture changed across those versions, the explicit import use melior::ir::operation::OperationLike; is now mandatory.
+
+
+
+
+
+
+
+
+
+
+
+
+8/8/26
+Kept For PACT Evaluation
+analyzer/: main locality-analysis executable and benchmark inputs
+raffine/: MLIR affine-program extraction library
+denning/: miss-ratio curve calculations
+cachegrind-runner/: cache simulation and SQLite result generation
+assoc-conv/: fully associative to set-associative conversion
+mrc/: miss-ratio curve processing utility
+scripts/: evaluation, simulation, plotting, and data-processing scripts
+data/: existing evaluation results and graphs
+.cargo/: Rust build configuration
+.vscode/: local LLVM/rust-analyzer configuration
+.agents/: empty environment-managed directory
+Cargo successfully recognizes the six remaining workspace packages. I preserved your existing changes to analyzer/src/salt.rs, perf.txt, and .dockerignore. A full build was not run because deleting target/ requires compiling the LLVM-dependent workspace from scratch.
+
+ywu@opti7050:~/autolala-25.10.30$ rustup update
+info: syncing channel updates for stable-x86_64-unknown-linux-gnu
+info: latest update on 2026-07-16 for version 1.97.1 (8bab26f4f 2026-07-14)
+info: latest update on 2026-08-09 for version 1.99.0-nightly (771916f90 2026-08-08)                    
+  stable-x86_64-unknown-linux-gnu updated - rustc 1.97.1 (8bab26f4f 2026-07-14) (from rustc 1.95.0 (59807616e 2026-04-14))
+  nightly-x86_64-unknown-linux-gnu updated - rustc 1.99.0-nightly (771916f90 2026-08-08) (from rustc 1.97.0-nightly (67bcaa9c4 2026-05-01))
+
+
+Restored and improved all four SALT validators in [salt.rs](/home/ywu/autolala-25.10.30/analyzer/src/salt.rs):
+no_coefficient_for_block
+has_reuses_helper
+has_reuses
+is_perfectly_nested
+Fixes include:
+Induction variables no longer leak between sibling loops.
+Every affine-map result is checked for non-unit coefficients.
+Empty blocks are rejected as perfectly nested.
+Failed affine-map conversions fail validation conservatively.
+Conditionals remain unsupported.
+Documentation explains each predicate.
+Enforcement remains optional and disabled in main.rs.
+Added four regression tests covering coefficient checking, sibling-loop scope, reuse detection, and empty perfect nests.
+Verification passed:
+4 tests passed
+Strict analyzer Clippy passed
+Analyzer build passed
+Formatting and diff checks passed
+
+
+mlir-opt 4d_tensor.mlir \
+  --affine-loop-tile="tile-size=8" \
+  --affine-loop-normalize="promote-single-iter" \
+  --affine-simplify-structures \
+  --canonicalize \
+  -o tiled.mlir
+
+
+
+# To backup some directories, run the following commands in the terminal:
+ts=$(date +%Y-%m-%d_%H-%M-%S)
+tar -I zstd -cf ".backup/data_${ts}.tar.zst" data
+tar -I zstd -cf ".backup/scripts_${ts}.tar.zst" scripts

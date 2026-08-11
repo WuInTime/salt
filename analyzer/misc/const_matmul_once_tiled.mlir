@@ -1,8 +1,8 @@
 module {
   func.func @matmul(%C: memref<?x?xf32>, %A: memref<?x?xf32>, %B: memref<?x?xf32>) {  // Removed %arg6, %arg7, %arg8
-    affine.for %i = 0 to 512 step 32 {  
-      affine.for %j = 0 to 512 step 32 {
-        affine.for %k = 0 to 512 step 32 { 
+    affine.for %i = 0 to 256 step 32 {
+      affine.for %j = 0 to 256 step 32 {
+        affine.for %k = 0 to 256 step 32 {
           affine.for %ii = 0 to 32 { 
             affine.for %jj = 0 to 32 { 
               affine.for %kk = 0 to 32 { 
