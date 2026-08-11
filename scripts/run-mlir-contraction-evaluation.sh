@@ -9,6 +9,7 @@ contraction_root="$repository_root/benchmarks/mlir-contractions"
 constant_dir="$contraction_root/constant"
 source_tiled_dir="$constant_dir/tiled"
 results_dir=${RESULTS_DIR:-"$repository_root/results/mlir-contractions"}
+build_dir="$repository_root/target/mlir-contraction-evaluation"
 work_dir="$results_dir/work"
 staged_constant_dir="$work_dir/constant"
 tiled_dir="$staged_constant_dir/tiled"
@@ -24,13 +25,15 @@ elif [[ $# -ne 0 ]]; then
 fi
 
 echo "Building Barvinok/SALT analyzer and Cachegrind runner..."
-cargo build --release -p analyzer --bin analyzer \
+cargo build --locked --release -p analyzer --bin analyzer \
+    --target-dir "$build_dir" \
     --manifest-path "$repository_root/Cargo.toml"
-cargo build --release -p cachegrind-runner --bin cachegrind-runner \
+cargo build --locked --release -p cachegrind-runner --bin cachegrind-runner \
+    --target-dir "$build_dir" \
     --manifest-path "$repository_root/Cargo.toml"
 
-analyzer="$repository_root/target/release/analyzer"
-cachegrind_runner="$repository_root/target/release/cachegrind-runner"
+analyzer="$build_dir/release/analyzer"
+cachegrind_runner="$build_dir/release/cachegrind-runner"
 
 # Stage inputs only after the potentially long builds. This also recreates the
 # output tree if an earlier result directory was cleaned while Cargo ran.
@@ -162,6 +165,7 @@ python3 "$repository_root/scripts/graph_contractions_salt_vs_cg.py" \
 if ! $smoke_test; then
     echo "Measuring symbolic Barvinok/SALT and generating selected timing figure..."
     python3 "$repository_root/scripts/measure_timing_selected.py" \
+        --analyzer "$analyzer" \
         --simulation-times "$simulation_timing" \
         --simulation-db "$fully_db" \
         --cache-limit-bytes "$cache_limit_bytes" \

@@ -8,13 +8,14 @@ data/
 data.tar.zst
 *.tar.zst
 results/
+results.old/
 /run*
 /fix*
 
 # Added by cargo
 
 target
-Cargo.lock
+# Cargo.lock
 perf.data*
 flamegraph.svg
 *.sqlite
@@ -28,3 +29,4 @@ flamegraph.svg
 result.txt
 .codex
 benchmarks/mlir-contractions/results.old*
+some_notes.txt

@@ -13,6 +13,12 @@ simulations of fully associative, 8-way, and 12-way L1 data caches.
 - Python 3
 - Python packages: `matplotlib`, `numpy`, and `pandas`
 
+Install the pinned Python dependencies from the repository root:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
 The experiment starts from MLIR, so Polygeist is not required. The older C
 benchmark scripts under `scripts/` contain a machine-specific Polygeist path
 and are not part of this workflow.
@@ -81,7 +87,7 @@ mlir-opt constant_input.mlir \
 Generate a SALT curve:
 
 ```bash
-cargo run --release -p analyzer --no-default-features --bin analyzer -- \
+cargo run --locked --release -p analyzer --no-default-features --bin analyzer -- \
   -i input.mlir --json -o output.json salt --block-size=8
 ```
 
@@ -100,8 +106,8 @@ All paths accepted by `graph_contractions_salt_vs_cg.py` can be overridden; run
 Build the Barvinok-enabled analyzer and Cachegrind runner first:
 
 ```bash
-cargo build --release -p analyzer --bin analyzer
-cargo build --release -p cachegrind-runner --bin cachegrind-runner
+cargo build --locked --release -p analyzer --bin analyzer
+cargo build --locked --release -p cachegrind-runner --bin cachegrind-runner
 ```
 
 The full evaluation command already records wall time around each tiled

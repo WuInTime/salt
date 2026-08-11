@@ -149,5 +149,24 @@ mlir-opt 4d_tensor.mlir \
 
 # To backup some directories, run the following commands in the terminal:
 ts=$(date +%Y-%m-%d_%H-%M-%S)
+tar -I zstd -cf ".backup/analyzer_${ts}.tar.zst" analyzer
+
+
 tar -I zstd -cf ".backup/data_${ts}.tar.zst" data
-tar -I zstd -cf ".backup/scripts_${ts}.tar.zst" scripts
+
+
+
+repository_root=/home/ywu/autolala-25.10.30
+results_dir="$repository_root/results/mlir-contractions"
+fully_db="$results_dir/data-fully-associative.db"
+way8_db="$results_dir/data-8way-associative.db"
+way12_db="$results_dir/data-12way-associative.db"
+staged_constant_dir="$results_dir/work/constant"
+MPLCONFIGDIR=/tmp/autolala-matplotlib python3 "$repository_root/scripts/graph_contractions_salt_vs_cg.py" \
+    --fully-db "$fully_db" \
+    --8way-db "$way8_db" \
+    --12way-db "$way12_db" \
+    --constant-dir "$staged_constant_dir" \
+    --output-dir "$results_dir
+
+# export SYMBOLICA_LICENSE="6eafb84c#6bd7c5af#6c8d99b8-7b93-5f03-a675-e45011b5617e"

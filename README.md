@@ -19,8 +19,8 @@ export MLIR_SYS_210_PREFIX=/usr/lib/llvm-21
 export TABLEGEN_210_PREFIX=/usr/lib/llvm-21
 
 # build and test
-cargo build --release
-cargo test --release
+cargo build --locked --release
+cargo test --locked --release
 ```
 
 
@@ -42,7 +42,7 @@ export PATH="/home/ywu/.local/llvm-21-mlir/bin:$PATH"; export MLIR_SYS_210_PREFI
 Build the analyzer:
 
 ```bash
-cargo build --release --bin analyzer
+cargo build --locked --release --bin analyzer
 ```
 
 Run SALT analysis:
@@ -58,10 +58,10 @@ Notes:
 - You can run without prebuilding:
 
 ```bash
-cargo run -r -b analyzer -- -i /path/to/input.mlir --json -o /path/to/output.json salt --block-size 8
+cargo run --locked -r -b analyzer -- -i /path/to/input.mlir --json -o /path/to/output.json salt --block-size 8
 ```
 
-cargo run -r -b analyzer -- -i benchmarks/examples/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
+cargo run --locked -r -b analyzer -- -i benchmarks/examples/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
 
 target/release/analyzer -i benchmarks/examples/sym_heat_center_only.mlir -m test.svg --json salt --block-size=8
 
