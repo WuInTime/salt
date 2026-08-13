@@ -88,7 +88,7 @@ RUN git config --global \
     url."https://repo.or.cz/".insteadOf "git://repo.or.cz/"
 
 # Compile both the evaluator-facing binaries and test harnesses during image
-# construction so the first smoke/reproduction run does not rebuild them.
+# construction so dependency and standalone-binary failures happen early.
 RUN cargo test --release --locked --workspace --no-run \
     && cargo build --release --locked --workspace
 

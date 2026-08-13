@@ -36,6 +36,6 @@ result.txt
 .codex
 benchmarks/mlir-contractions/results.old*
 some_notes.txt
-*pact26-ae-v1.tar.gz
+salt-pact26-ae-v*.tar.gz
 salt_vs_hw_misses_package/benchmarks/bin
 benchmarks/matmul-t0-t2/og.py
