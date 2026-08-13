@@ -8,7 +8,7 @@ repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 benchmark_dir="$repository_root/benchmarks/matmul-t0-t2"
 example_dir="$repository_root/benchmarks/examples"
 results_dir=${RESULTS_DIR:-"$repository_root/results/matmul-t0-t2"}
-build_dir="$repository_root/target/matmul-t0-t2-evaluation"
+build_dir="$repository_root/target"
 max_cache_blocks=${MAX_CACHE_BLOCKS:-32768}
 cache_step=${CACHE_STEP:-1}
 cache_sampling=${CACHE_SAMPLING:-geometric}
@@ -16,8 +16,7 @@ cache_growth_factor=${CACHE_GROWTH_FACTOR:-1.5}
 
 mkdir -p "$results_dir"
 
-cargo build --locked --release -p analyzer --no-default-features --bin analyzer \
-    --target-dir "$build_dir" \
+cargo build --locked --release -p analyzer --bin analyzer \
     --manifest-path "$repository_root/Cargo.toml"
 analyzer="$build_dir/release/analyzer"
 

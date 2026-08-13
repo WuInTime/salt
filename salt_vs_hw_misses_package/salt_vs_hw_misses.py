@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive SALT miss counts, compare them with PMC results, and plot the figure.
+"""Generate SALT miss counts, compare them with PMC results, and plot the figure.
 
 The SALT JSON parsing and piecewise cache-size lookup are extracted from
 tools/compare_pmu_cachegrind.py. Cachegrind database handling is intentionally
@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import math
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -25,9 +26,15 @@ from scipy import stats
 
 
 HERE = Path(__file__).resolve().parent
+REPOSITORY_ROOT = HERE.parent
 DEFAULT_PMC = HERE / "data" / "pmu_i7-7700_result.csv"
 DEFAULT_RESULTS = HERE / "data" / "salt_vs_hw_misses_results.csv"
-DEFAULT_PLOT = HERE / "output" / "salt_vs_hw_misses.svg"
+DEFAULT_PLOT = HERE / "output" / "salt_vs_hw_misses_new.svg"
+DEFAULT_SALT_JSON_DIR = (
+    REPOSITORY_ROOT / "results" / "mlir-contractions" / "work" / "constant"
+)
+CONTRACTION_DIR = REPOSITORY_ROOT / "benchmarks" / "mlir-contractions" / "constant"
+STENCIL_INPUT = REPOSITORY_ROOT / "benchmarks" / "examples" / "const_stencil5pt.mlir"
 
 BENCHMARKS = (
     "orig_3d_tensor_vector",
@@ -46,7 +53,7 @@ BENCHMARKS = (
     "tiled_matrix_matrix",
     "tiled_matrix_vector",
     "tiled_rowwise_softmax_max",
-    "orig_stencil",
+    "orig_stencil5pt",
 )
 
 
@@ -54,9 +61,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--salt-json-dir",
-        required=True,
         type=Path,
-        help="directory containing generated *-salt.json files (searched recursively)",
+        default=DEFAULT_SALT_JSON_DIR,
+        help=(
+            "directory in which to generate *-salt.json files "
+            f"(default: {DEFAULT_SALT_JSON_DIR})"
+        ),
     )
     parser.add_argument(
         "--pmc",
@@ -87,6 +97,53 @@ def json_name_for(program: str) -> str:
     if program.startswith("orig_"):
         return "constant_" + program.removeprefix("orig_") + "-salt.json"
     return program + "-salt.json"
+
+
+def mlir_input_for(program: str) -> Path:
+    if program == "orig_stencil5pt":
+        return STENCIL_INPUT
+    if program.startswith("orig_"):
+        name = "constant_" + program.removeprefix("orig_") + ".mlir"
+        return CONTRACTION_DIR / name
+    if program.startswith("tiled_"):
+        return CONTRACTION_DIR / "tiled" / f"{program}.mlir"
+    raise ValueError(f"unknown benchmark name: {program}")
+
+
+def generate_salt_jsons(root: Path) -> None:
+    missing_inputs = [mlir_input_for(program) for program in BENCHMARKS]
+    missing_inputs = [path for path in missing_inputs if not path.is_file()]
+    if missing_inputs:
+        raise FileNotFoundError(
+            "missing MLIR inputs: " + ", ".join(map(str, missing_inputs))
+        )
+
+    for program in BENCHMARKS:
+        input_path = mlir_input_for(program)
+        output_dir = root / "tiled" if program.startswith("tiled_") else root
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / json_name_for(program)
+        print(f"Generating SALT prediction for {program}...")
+        subprocess.run(
+            [
+                "cargo",
+                "run",
+                "--locked",
+                "--release",
+                "--bin",
+                "analyzer",
+                "--",
+                "-i",
+                str(input_path),
+                "--json",
+                "-o",
+                str(output_path),
+                "salt",
+                "--block-size=8",
+            ],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+        )
 
 
 def index_json_files(root: Path) -> dict[str, Path]:
@@ -296,11 +353,13 @@ def plot_results(rows: list[dict[str, Any]], path: Path) -> tuple[float, float]:
 
 def main() -> int:
     args = parse_args()
+    args.salt_json_dir = args.salt_json_dir.resolve()
+    generate_salt_jsons(args.salt_json_dir)
     rows = derive_results(args)
     write_results(rows, args.results_output)
     mare, pearson_r = plot_results(rows, args.plot_output)
     print(
-        f"benchmarks={len(rows)} MARE={mare:.6f} Pearson_r={pearson_r:.6f}\n"
+        f"benchmarks={len(rows)} MARE={mare:.4f} Pearson_r={pearson_r:.4f}\n"
         f"wrote {args.results_output}\n"
         f"wrote {args.plot_output}"
     )

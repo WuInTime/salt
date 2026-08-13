@@ -14,7 +14,6 @@ target/
 **/target/
 
 # Local data, cache, & output directories
-data/
 results/
 artifact-results/
 full-results/
@@ -56,8 +55,9 @@ flamegraph.svg
 *.db-journal
 *.log
 /*.png
-/*.svg
 result.txt
 .codex
 some_notes.txt
-results.old/
+results.old*
+
+salt_vs_hw_misses_package/benchmarks/bin

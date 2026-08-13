@@ -11,7 +11,7 @@ ORIG_SOURCES := \
 	kernels/orig/constant_matrix_matrix.c \
 	kernels/orig/constant_matrix_vector.c \
 	kernels/orig/constant_rowwise_softmax_max.c \
-	kernels/orig/constant_stencil.c
+	kernels/orig/constant_stencil5pt.c
 
 TILED_SOURCES := \
 	kernels/tiled/tiled_3d_tensor_vector.c \

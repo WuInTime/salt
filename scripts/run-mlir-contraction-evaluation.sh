@@ -11,7 +11,7 @@ contraction_root="$repository_root/benchmarks/mlir-contractions"
 constant_dir="$contraction_root/constant"
 source_tiled_dir="$constant_dir/tiled"
 results_dir=${RESULTS_DIR:-"$repository_root/results/mlir-contractions"}
-build_dir="$repository_root/target/mlir-contraction-evaluation"
+build_dir="$repository_root/target"
 work_dir="$results_dir/work"
 staged_constant_dir="$work_dir/constant"
 tiled_dir="$staged_constant_dir/tiled"
@@ -28,10 +28,8 @@ fi
 
 echo "Building Barvinok/SALT analyzer and Cachegrind runner..."
 cargo build --locked --release -p analyzer --bin analyzer \
-    --target-dir "$build_dir" \
     --manifest-path "$repository_root/Cargo.toml"
 cargo build --locked --release -p cachegrind-runner --bin cachegrind-runner \
-    --target-dir "$build_dir" \
     --manifest-path "$repository_root/Cargo.toml"
 
 analyzer="$build_dir/release/analyzer"

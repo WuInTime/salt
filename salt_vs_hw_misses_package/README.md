@@ -1,7 +1,8 @@
 # SALT vs. hardware L1D misses package
 
-This package derives SALT miss counts from generated SALT JSON files, compares
-them with measured PMC L1D load misses, and creates `salt_vs_hw_misses.svg`.
+This package generates SALT miss-count JSON files from the repository's MLIR,
+compares them with measured PMC L1D load misses, and creates
+`salt_vs_hw_misses.svg`.
 It includes the exact C sources and PMC collector for the 16 orig/tiled
 benchmarks plus original stencil, for 17 benchmarks total.
 
@@ -14,14 +15,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 
-python3 salt_vs_hw_misses.py \
-  --salt-json-dir /path/to/generated/salt/json
+python3 salt_vs_hw_misses.py
 ```
 
 That single command performs all three analysis steps:
 
-1. Reads each SALT miss-ratio JSON and derives its miss count for the selected
-   cache size.
+1. Runs the SALT analyzer on each MLIR input, then derives its miss count for
+   the selected cache size.
 2. Matches those estimates with the PMC measurements by benchmark name and
    writes `data/salt_vs_hw_misses_results.csv`.
 3. Calculates MARE and Pearson correlation and writes
@@ -33,16 +33,13 @@ By default it compares against the pre-measured Intel i7-7700 data in
 To compare against a newly collected PMC file instead:
 
 ```bash
-python3 salt_vs_hw_misses.py \
-  --salt-json-dir /path/to/generated/salt/json \
-  --pmc data/pmu_results_17_new.csv
+python3 salt_vs_hw_misses.py --pmc data/pmu_results_17_new.csv
 ```
 
 Custom output paths and cache geometry are also supported:
 
 ```bash
 python3 salt_vs_hw_misses.py \
-  --salt-json-dir /path/to/generated/salt/json \
   --pmc /path/to/pmc.csv \
   --results-output data/my_results.csv \
   --plot-output output/my_graph.svg \
@@ -57,10 +54,17 @@ miss-ratio curve is evaluated at 512 cache lines. The derived miss count is:
 salt_estimated_miss_count = selected_miss_ratio × total_count
 ```
 
-## SALT JSON input
+## SALT generation
 
-`--salt-json-dir` is searched recursively, so the JSON files can be flat or in
-the original `constant/` and `constant/tiled/` layout. Each file must provide
+The script runs `cargo run --locked --release --bin analyzer` with the SALT
+block size set to 8. The eight original and eight tiled contraction inputs come
+from `benchmarks/mlir-contractions/constant/`; the stencil input comes from
+`benchmarks/examples/const_stencil5pt.mlir`.
+
+Generated JSON defaults to `results/mlir-contractions/work/constant/` at the
+repository root, with
+tiled results in its `tiled/` subdirectory. Pass `--salt-json-dir` only when a
+different output location is wanted. Each generated file provides
 `total_count`, `miss_ratio`, and `turning_points`, for example:
 
 ```json
@@ -84,7 +88,7 @@ constant_context_lookup-salt.json
 constant_matrix_matrix-salt.json
 constant_matrix_vector-salt.json
 constant_rowwise_softmax_max-salt.json
-constant_stencil-salt.json
+constant_stencil5pt-salt.json
 ```
 
 Expected tiled filenames are:
@@ -100,8 +104,8 @@ tiled_matrix_vector-salt.json
 tiled_rowwise_softmax_max-salt.json
 ```
 
-The script requires all 17 JSON files and all 17 PMC rows. It reports missing
-or duplicate inputs rather than silently omitting benchmarks.
+The script requires all 17 MLIR inputs and all 17 PMC rows. It reports missing
+or duplicate results rather than silently omitting benchmarks.
 
 ## PMC input formats
 

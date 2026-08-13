@@ -49,6 +49,12 @@ fn trip_count_to_poly(id: usize) -> Poly {
     atom.to_rational_polynomial(&ring, &ring, None)
 }
 
+fn iteration_variable_to_poly(id: usize) -> Poly {
+    let ring = IntegerRing::new();
+    let atom = Atom::var(symbol!(format!("i{id}")));
+    atom.to_rational_polynomial(&ring, &ring, None)
+}
+
 fn iteration_variable_index(variable: &impl ToString) -> Option<usize> {
     variable.to_string().strip_prefix('i')?.parse().ok()
 }
@@ -167,18 +173,27 @@ pub fn get_reuse_interval_distribution<'a, 'b: 'a>(
     ref_count: usize,
     context: &AnalysisContext<'b>,
 ) -> HashMap<Poly, Poly> {
-    get_reuse_interval_distribution_impl(
+    let (distribution, _, _) = get_reuse_interval_distribution_with_instance_reports(
         tree,
         reuse_factors,
         trip_counts,
         ref_count,
         context,
-        &mut Vec::new(),
-    )
+    );
+    distribution
+}
+
+#[derive(Clone, Debug)]
+pub struct ReferenceInstanceReport {
+    pub reference: String,
+    pub distribution: Vec<(Poly, Poly)>,
+    pub adjustment: Option<(Poly, Poly)>,
+    pub adjustment_applied: bool,
 }
 
 /// Computes the reuse-interval distribution and the per-reference corrections needed by its
 /// miss-ratio curve.
+#[allow(dead_code, reason = "keeps the adjustment-only SALT API available")]
 pub fn get_reuse_interval_distribution_with_adjustments<'a, 'b: 'a>(
     tree: &Tree<'a>,
     reuse_factors: &mut HashMap<usize, Poly>,
@@ -186,16 +201,324 @@ pub fn get_reuse_interval_distribution_with_adjustments<'a, 'b: 'a>(
     ref_count: usize,
     context: &AnalysisContext<'b>,
 ) -> (HashMap<Poly, Poly>, Vec<(Poly, Poly)>) {
+    let (distribution, adjustments, _) = get_reuse_interval_distribution_with_instance_reports(
+        tree,
+        reuse_factors,
+        trip_counts,
+        ref_count,
+        context,
+    );
+    (distribution, adjustments)
+}
+
+/// Computes the kernel distribution, the adjustments actually passed to Denning recursion, and
+/// a diagnostic report for every static memory-reference instance.
+pub fn get_reuse_interval_distribution_with_instance_reports<'a, 'b: 'a>(
+    tree: &Tree<'a>,
+    reuse_factors: &mut HashMap<usize, Poly>,
+    trip_counts: &mut HashMap<usize, Poly>,
+    ref_count: usize,
+    context: &AnalysisContext<'b>,
+) -> (
+    HashMap<Poly, Poly>,
+    Vec<(Poly, Poly)>,
+    Vec<ReferenceInstanceReport>,
+) {
     let mut adjustments = Vec::new();
-    let distribution = get_reuse_interval_distribution_impl(
+    let mut instance_reports = Vec::new();
+    let mut distribution = get_reuse_interval_distribution_impl(
         tree,
         reuse_factors,
         trip_counts,
         ref_count,
         context,
         &mut adjustments,
+        &mut instance_reports,
     );
-    (distribution, adjustments)
+    apply_restricted_constant_offset_group_reuse(
+        tree,
+        trip_counts,
+        context,
+        &mut distribution,
+        &mut instance_reports,
+    );
+    adjustments = instance_reports
+        .iter()
+        .filter(|report| report.adjustment_applied)
+        .filter_map(|report| report.adjustment.clone())
+        .collect();
+    (distribution, adjustments, instance_reports)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum MemrefKey {
+    Local(usize),
+    Global(String),
+}
+
+fn memref_key(memref: &ValID) -> Option<MemrefKey> {
+    match memref {
+        ValID::Memref(id) => Some(MemrefKey::Local(*id)),
+        ValID::Global(name) => Some(MemrefKey::Global(name.to_string())),
+        _ => None,
+    }
+}
+
+fn constant_poly_to_isize(poly: &Poly) -> Option<isize> {
+    if !poly.numerator.is_constant() || !poly.denominator.is_constant() {
+        return None;
+    }
+    let numerator = poly
+        .numerator
+        .get_constant()
+        .to_string()
+        .parse::<isize>()
+        .ok()?;
+    let denominator = poly
+        .denominator
+        .get_constant()
+        .to_string()
+        .parse::<isize>()
+        .ok()?;
+    if denominator == 0 || numerator % denominator != 0 {
+        return None;
+    }
+    Some(numerator / denominator)
+}
+
+/// Extracts `A[i0 + c0, ..., in + cn]`'s constant offsets.
+///
+/// Requiring one unit-coefficient induction variable per map result deliberately excludes
+/// tiled, strided, transposed, and symbolically shifted accesses from group reuse.
+fn constant_offsets<'a>(
+    map: AffineMap<'a>,
+    operands: &'a [ValID],
+    loop_ids: &[usize],
+) -> Option<Vec<isize>> {
+    let polys = convert_affine_map(map, operands).ok()?;
+    if polys.len() != loop_ids.len() {
+        return None;
+    }
+    polys
+        .iter()
+        .zip(loop_ids)
+        .map(|(poly, loop_id)| {
+            constant_poly_to_isize(&(poly.clone() - iteration_variable_to_poly(*loop_id)))
+        })
+        .collect()
+}
+
+fn add_distribution_mass(distribution: &mut HashMap<Poly, Poly>, interval: Poly, mass: Poly) {
+    // Equivalent rational polynomials can retain different internal variable orderings and
+    // consequently hash differently. Compare their normalized difference before inserting.
+    if let Some(portion) = distribution.iter_mut().find_map(|(candidate, portion)| {
+        (candidate.clone() - interval.clone())
+            .numerator
+            .is_zero()
+            .then_some(portion)
+    }) {
+        *portion = &*portion + &mass;
+    } else {
+        distribution.insert(interval, mass);
+    }
+}
+
+/// Applies restricted constant-offset group reuse for an untiled perfect loop nest.
+///
+/// For a fixed element, accesses `A[i + delta]` occur at iterations `i = x - delta`.
+/// Sorting offsets in reverse lexicographic order therefore gives their chronological order.
+/// Every access after the first replaces its ordinary cross-traversal reuse with the flattened
+/// loop-body displacement from its predecessor. Boundary and alignment effects remain outside
+/// this interior-pattern adjustment.
+fn apply_restricted_constant_offset_group_reuse(
+    tree: &Tree<'_>,
+    trip_counts: &HashMap<usize, Poly>,
+    context: &AnalysisContext<'_>,
+    distribution: &mut HashMap<Poly, Poly>,
+    instance_reports: &mut [ReferenceInstanceReport],
+) {
+    let mut loop_ids = Vec::new();
+    let mut current = tree;
+    loop {
+        match current {
+            Tree::For {
+                ivar: ValID::IVar(id),
+                step: 1,
+                body,
+                ..
+            } => {
+                loop_ids.push(*id);
+                current = body;
+            }
+            Tree::Block([only]) => current = only,
+            _ => break,
+        }
+    }
+
+    // This implementation models the row-major, two-loop interior pattern described above.
+    if loop_ids.len() != 2 {
+        return;
+    }
+    let Tree::Block(trees) = current else {
+        return;
+    };
+    if trees.is_empty() || !trees.iter().all(|tree| matches!(tree, Tree::Access { .. })) {
+        return;
+    }
+
+    let reference_count = trees.len();
+    let mut groups: Vec<(MemrefKey, Vec<(usize, Vec<isize>, bool)>)> = Vec::new();
+    for (instance, tree) in trees.iter().enumerate() {
+        let Tree::Access {
+            memref,
+            map,
+            operands,
+            is_write,
+        } = tree
+        else {
+            continue;
+        };
+        let (Some(memref), Some(offsets)) = (
+            memref_key(memref),
+            constant_offsets(*map, operands, &loop_ids),
+        ) else {
+            continue;
+        };
+        if let Some((_, group)) = groups
+            .iter_mut()
+            .find(|(candidate, _)| *candidate == memref)
+        {
+            group.push((instance, offsets, *is_write));
+        } else {
+            groups.push((memref, vec![(instance, offsets, *is_write)]));
+        }
+    }
+
+    let field = RationalPolynomialField::new(IntegerRing);
+    let block_poly = Atom::var(symbol!("b")).to_rational_polynomial(
+        &IntegerRing::new(),
+        &IntegerRing::new(),
+        None,
+    );
+    let reference_poly = constant_poly(reference_count as isize, context);
+    let replacement_mass = field.div(&constant_poly(1, context), &(&reference_poly * &block_poly));
+    let total_iterations = loop_ids
+        .iter()
+        .fold(constant_poly(1, context), |product, id| {
+            &product
+                * trip_counts
+                    .get(id)
+                    .expect("each stencil loop must have a trip count")
+        });
+    let long_interval =
+        &reference_poly * &(&(&total_iterations + &constant_poly(1, context)) - &block_poly);
+
+    for (_, mut instances) in groups {
+        // A load immediately followed by a store to the same element is exact within-body reuse.
+        // Its RI is the static memory-reference distance (one), rather than a loop displacement
+        // multiplied by the number of references.
+        instances.sort_by_key(|(instance, _, _)| *instance);
+        if instances.len() == 2
+            && instances[0].1 == instances[1].1
+            && !instances[0].2
+            && instances[1].2
+            && instances[1].0 == instances[0].0 + 1
+        {
+            let load_instance = instances[0].0;
+            let store_instance = instances[1].0;
+            let store_distribution = instance_reports[store_instance].distribution.clone();
+            for (interval, portion) in store_distribution {
+                add_distribution_mass(distribution, interval, -portion);
+            }
+
+            let immediate_interval = constant_poly(1, context);
+            let immediate_portion = field.div(&constant_poly(1, context), &reference_poly);
+            add_distribution_mass(
+                distribution,
+                immediate_interval.clone(),
+                immediate_portion.clone(),
+            );
+            distribution.retain(|_, portion| !portion.numerator.is_zero());
+
+            instance_reports[load_instance].adjustment_applied = true;
+            instance_reports[store_instance].distribution =
+                vec![(immediate_interval.clone(), immediate_portion.clone())];
+            instance_reports[store_instance].adjustment =
+                Some((immediate_interval, immediate_portion));
+            instance_reports[store_instance].adjustment_applied = false;
+            continue;
+        }
+
+        // Two identical accesses are not a shifted-reference group. Repeated offsets also make
+        // static operation order relevant, which this restricted adjustment intentionally avoids.
+        if instances.iter().any(|(_, _, is_write)| *is_write) {
+            continue;
+        }
+        instances.sort_by(|(_, left, _), (_, right, _)| right.cmp(left));
+        if instances.len() < 2 || instances.windows(2).any(|pair| pair[0].1 == pair[1].1) {
+            continue;
+        }
+
+        for (instance, _, _) in &instances {
+            instance_reports[*instance].adjustment_applied = false;
+        }
+        let first_instance = instances[0].0;
+        instance_reports[first_instance].adjustment =
+            Some((long_interval.clone(), replacement_mass.clone()));
+        instance_reports[first_instance].adjustment_applied = true;
+
+        for pair in instances.windows(2) {
+            let outer_delta = pair[0].1[0] - pair[1].1[0];
+            let inner_delta = pair[0].1[1] - pair[1].1[1];
+            let inner_trip_count = trip_counts
+                .get(&loop_ids[1])
+                .expect("the inner stencil loop must have a trip count");
+            let displacement = &(&constant_poly(outer_delta, context) * inner_trip_count)
+                + &constant_poly(inner_delta, context);
+            let replacement_interval = &reference_poly * &displacement;
+
+            add_distribution_mass(
+                distribution,
+                long_interval.clone(),
+                -replacement_mass.clone(),
+            );
+            add_distribution_mass(
+                distribution,
+                replacement_interval.clone(),
+                replacement_mass.clone(),
+            );
+
+            let instance = pair[1].0;
+            add_instance_distribution_mass(
+                &mut instance_reports[instance].distribution,
+                long_interval.clone(),
+                -replacement_mass.clone(),
+            );
+            add_instance_distribution_mass(
+                &mut instance_reports[instance].distribution,
+                replacement_interval.clone(),
+                replacement_mass.clone(),
+            );
+            instance_reports[instance].adjustment =
+                Some((replacement_interval, replacement_mass.clone()));
+        }
+    }
+}
+
+fn add_instance_distribution_mass(
+    distribution: &mut Vec<(Poly, Poly)>,
+    interval: Poly,
+    mass: Poly,
+) {
+    if let Some((_, portion)) = distribution
+        .iter_mut()
+        .find(|(candidate, _)| (candidate.clone() - interval.clone()).numerator.is_zero())
+    {
+        *portion = &*portion + &mass;
+    } else {
+        distribution.push((interval, mass));
+    }
+    distribution.retain(|(_, portion)| !portion.numerator.is_zero());
 }
 
 fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
@@ -205,6 +528,7 @@ fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
     ref_count: usize,
     context: &AnalysisContext<'b>,
     curve_adjustments: &mut Vec<(Poly, Poly)>,
+    instance_reports: &mut Vec<ReferenceInstanceReport>,
 ) -> HashMap<Poly, Poly> {
     match tree {
         Tree::For {
@@ -250,6 +574,7 @@ fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
                 ref_count,
                 context,
                 curve_adjustments,
+                instance_reports,
             )
         }
         Tree::Block(trees) => {
@@ -262,6 +587,7 @@ fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
                     trees.len(),
                     context,
                     curve_adjustments,
+                    instance_reports,
                 );
                 for (interval, portion) in subtree_distribution {
                     ri_dist
@@ -423,7 +749,7 @@ fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
             reuse_intervals.reverse();
 
             if let Some((highest_interval, _)) = reuse_intervals.first() {
-                curve_adjustments.push((highest_interval.clone(), curve_adjustment));
+                curve_adjustments.push((highest_interval.clone(), curve_adjustment.clone()));
             }
 
             let mut ri_dist: HashMap<Poly, Poly> = HashMap::new();
@@ -473,6 +799,18 @@ fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
                 .expect("the block reuse interval must be present");
             *block_portion =
                 &*block_portion + &field.div(&block_portion_adjustment, &reference_count);
+            let adjustment = reuse_intervals
+                .first()
+                .map(|(interval, _)| (interval.clone(), curve_adjustment));
+            instance_reports.push(ReferenceInstanceReport {
+                reference: tree.to_string(),
+                distribution: ri_dist
+                    .iter()
+                    .map(|(interval, portion)| (interval.clone(), portion.clone()))
+                    .collect(),
+                adjustment,
+                adjustment_applied: true,
+            });
             ri_dist
         }
 
@@ -484,9 +822,98 @@ fn get_reuse_interval_distribution_impl<'a, 'b: 'a>(
 struct SaltResult {
     ri_values: Vec<String>,
     portions: Vec<String>,
+    reference_instances: Vec<SerializedReferenceInstance>,
     total_count: String,
     miss_ratio_curve: MissRatioCurve,
     analysis_time: Duration,
+}
+
+#[derive(Serialize)]
+struct SerializedReferenceInstance {
+    instance: usize,
+    reference: String,
+    ri_values: Vec<String>,
+    portions: Vec<String>,
+    adjustment_ri: Option<String>,
+    adjustment: Option<String>,
+    adjustment_applied: bool,
+}
+
+fn poly_string(poly: &Poly) -> String {
+    poly.to_expression()
+        .printer(PrintOptions::file_no_namespace())
+        .to_string()
+}
+
+pub fn substitute_instance_report_block_size(
+    report: &ReferenceInstanceReport,
+    block_size: usize,
+) -> ReferenceInstanceReport {
+    ReferenceInstanceReport {
+        reference: report.reference.clone(),
+        distribution: report
+            .distribution
+            .iter()
+            .map(|(interval, portion)| {
+                (
+                    substitute_block_size(interval, block_size),
+                    substitute_block_size(portion, block_size),
+                )
+            })
+            .collect(),
+        adjustment: report.adjustment.as_ref().map(|(interval, adjustment)| {
+            (
+                substitute_block_size(interval, block_size),
+                substitute_block_size(adjustment, block_size),
+            )
+        }),
+        adjustment_applied: report.adjustment_applied,
+    }
+}
+
+pub fn create_instance_table(reports: &[ReferenceInstanceReport]) -> comfy_table::Table {
+    use comfy_table::ContentArrangement;
+    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+    use comfy_table::presets::UTF8_FULL;
+
+    let mut table = comfy_table::Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            "Instance",
+            "Reference",
+            "RI Value",
+            "Portion",
+            "Adjustment RI",
+            "Adjustment",
+            "Applied",
+        ]);
+    for (instance, report) in reports.iter().enumerate() {
+        let (adjustment_ri, adjustment) = report
+            .adjustment
+            .as_ref()
+            .map(|(interval, adjustment)| (poly_string(interval), poly_string(adjustment)))
+            .unwrap_or_else(|| ("-".into(), "-".into()));
+        for (interval, portion) in &report.distribution {
+            table.add_row([
+                instance.to_string(),
+                report.reference.clone(),
+                poly_string(interval),
+                poly_string(portion),
+                adjustment_ri.clone(),
+                adjustment.clone(),
+                if report.adjustment_applied {
+                    "yes"
+                } else {
+                    "no"
+                }
+                .into(),
+            ]);
+        }
+    }
+    table
 }
 
 /// Multiplies the access count by every enclosing loop's trip count.
@@ -596,6 +1023,7 @@ pub fn substitute_block_size(poly: &Poly, block_size: usize) -> Poly {
 pub fn create_json_output<'a, I>(
     dist: &[(Poly, Poly)],
     adjustments: &[(Poly, Poly)],
+    instance_reports: &[ReferenceInstanceReport],
     accesses: usize,
     trip_counts: I,
     start_time: Instant,
@@ -604,21 +1032,33 @@ where
     I: Iterator<Item = &'a Poly>,
 {
     let total_count = get_total_count(accesses, trip_counts);
-    let ri_values: Vec<String> = dist
+    let ri_values: Vec<String> = dist.iter().map(|(poly, _)| poly_string(poly)).collect();
+    let portions: Vec<String> = dist.iter().map(|(_, poly)| poly_string(poly)).collect();
+    let reference_instances = instance_reports
         .iter()
-        .map(|(poly, _)| {
-            poly.to_expression()
-                .printer(PrintOptions::file_no_namespace())
-                // .printer(PrintOptions::latex())
-                .to_string()
-        })
-        .collect();
-    let portions: Vec<String> = dist
-        .iter()
-        .map(|(_, poly)| {
-            poly.to_expression()
-                .printer(PrintOptions::file_no_namespace())
-                .to_string()
+        .enumerate()
+        .map(|(instance, report)| SerializedReferenceInstance {
+            instance,
+            reference: report.reference.clone(),
+            ri_values: report
+                .distribution
+                .iter()
+                .map(|(interval, _)| poly_string(interval))
+                .collect(),
+            portions: report
+                .distribution
+                .iter()
+                .map(|(_, portion)| poly_string(portion))
+                .collect(),
+            adjustment_ri: report
+                .adjustment
+                .as_ref()
+                .map(|(interval, _)| poly_string(interval)),
+            adjustment: report
+                .adjustment
+                .as_ref()
+                .map(|(_, adjustment)| poly_string(adjustment)),
+            adjustment_applied: report.adjustment_applied,
         })
         .collect();
     let total_count = total_count
@@ -631,6 +1071,7 @@ where
     let result = SaltResult {
         ri_values,
         portions,
+        reference_instances,
         total_count,
         miss_ratio_curve,
         analysis_time,
@@ -824,6 +1265,213 @@ mod tests {
                 .evaluate(|value| value.to_f64(), &empty_const_map, &empty_symbol_map)
                 .expect("the adjustment must be numeric");
             assert_close(adjustment, 1.0 / 7.0);
+        });
+    }
+
+    #[test]
+    fn five_point_stencil_uses_constant_offset_group_reuse() {
+        AnalysisContext::start(|context| {
+            let mlir_context = context.mcontext();
+            let operands = [ValID::IVar(0), ValID::IVar(1)];
+            let make_map = |outer_offset, inner_offset| {
+                AffineMap::new(
+                    mlir_context,
+                    2,
+                    0,
+                    &[
+                        AffineExpr::new_dim(mlir_context, 0)
+                            + AffineExpr::new_constant(mlir_context, outer_offset),
+                        AffineExpr::new_dim(mlir_context, 1)
+                            + AffineExpr::new_constant(mlir_context, inner_offset),
+                    ],
+                )
+            };
+
+            let bottom = access(make_map(1, 0), &operands);
+            let left = access(make_map(0, -1), &operands);
+            let center = access(make_map(0, 0), &operands);
+            let right = access(make_map(0, 1), &operands);
+            let top = access(make_map(-1, 0), &operands);
+            assert_eq!(
+                constant_offsets(make_map(1, 0), &operands, &[0, 1]),
+                Some(vec![1, 0])
+            );
+            let output = Tree::Access {
+                memref: ValID::Memref(1),
+                map: make_map(0, 0),
+                operands: &operands,
+                is_write: true,
+            };
+            let accesses = [&bottom, &left, &center, &right, &top, &output];
+            let body = Tree::Block(&accesses);
+            let inner = Tree::For {
+                lower_bound: AffineMap::new_constant(mlir_context, 0),
+                upper_bound: AffineMap::new_constant(mlir_context, 20),
+                lower_bound_operands: &[],
+                upper_bound_operands: &[],
+                step: 1,
+                ivar: ValID::IVar(1),
+                body: &body,
+            };
+            let tree = Tree::For {
+                lower_bound: AffineMap::new_constant(mlir_context, 0),
+                upper_bound: AffineMap::new_constant(mlir_context, 10),
+                lower_bound_operands: &[],
+                upper_bound_operands: &[],
+                step: 1,
+                ivar: ValID::IVar(0),
+                body: &inner,
+            };
+            let mut reuse_factors = HashMap::new();
+            let mut trip_counts = HashMap::new();
+
+            let (distribution, adjustments, instance_reports) =
+                get_reuse_interval_distribution_with_instance_reports(
+                    &tree,
+                    &mut reuse_factors,
+                    &mut trip_counts,
+                    1,
+                    &context,
+                );
+            let distribution = distribution
+                .into_iter()
+                .map(|(interval, portion)| {
+                    (
+                        substitute_block_size(&interval, 4),
+                        substitute_block_size(&portion, 4),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let numeric = get_ri_distribution(&distribution);
+
+            assert_eq!(numeric.len(), 4, "distribution: {numeric:?}"); // Includes (0, 0).
+            assert_eq!(numeric[1].0, 6);
+            assert_close(numeric[1].1, 5.0 / 6.0);
+            assert_eq!(numeric[2].0, 114); // 6 * TC_j - 6.
+            assert_close(numeric[2].1, 1.0 / 12.0);
+            assert_eq!(numeric[3].0, 1182); // 6 * TC_i * TC_j + 6 - 6b.
+            assert_close(numeric[3].1, 1.0 / 12.0);
+
+            let numeric_adjustments = adjustments
+                .iter()
+                .map(|(interval, adjustment)| {
+                    let interval = substitute_block_size(interval, 4)
+                        .to_expression()
+                        .evaluate(
+                            |value| value.to_f64(),
+                            &AHashMap::<Atom, f64>::new(),
+                            &AHashMap::new(),
+                        )
+                        .expect("the adjustment interval must be numeric")
+                        as isize;
+                    let adjustment = substitute_block_size(adjustment, 4)
+                        .to_expression()
+                        .evaluate(
+                            |value| value.to_f64(),
+                            &AHashMap::<Atom, f64>::new(),
+                            &AHashMap::new(),
+                        )
+                        .expect("the adjustment must be numeric");
+                    (interval, adjustment)
+                })
+                .fold(AHashMap::new(), |mut totals, (interval, adjustment)| {
+                    *totals.entry(interval).or_insert(0.0) += adjustment;
+                    totals
+                });
+
+            // Five A instances contribute one adjustment at their largest RI. B contributes
+            // its own adjustment at the same RI: 2 / (6 * b) = 1 / 12 for b = 4.
+            assert_eq!(numeric_adjustments.len(), 1);
+            assert_close(numeric_adjustments[&1182], 1.0 / 12.0);
+
+            assert_eq!(instance_reports.len(), 6);
+            assert!(
+                instance_reports
+                    .iter()
+                    .all(|report| report.adjustment.is_some())
+            );
+            assert_eq!(
+                instance_reports[..5]
+                    .iter()
+                    .filter(|report| report.adjustment_applied)
+                    .count(),
+                1
+            );
+            assert!(instance_reports[5].adjustment_applied);
+
+            let output_load = Tree::Access {
+                memref: ValID::Memref(1),
+                map: make_map(0, 0),
+                operands: &operands,
+                is_write: false,
+            };
+            let accesses = [&bottom, &left, &center, &right, &top, &output_load, &output];
+            let body = Tree::Block(&accesses);
+            let inner = Tree::For {
+                lower_bound: AffineMap::new_constant(mlir_context, 0),
+                upper_bound: AffineMap::new_constant(mlir_context, 20),
+                lower_bound_operands: &[],
+                upper_bound_operands: &[],
+                step: 1,
+                ivar: ValID::IVar(1),
+                body: &body,
+            };
+            let tree = Tree::For {
+                lower_bound: AffineMap::new_constant(mlir_context, 0),
+                upper_bound: AffineMap::new_constant(mlir_context, 10),
+                lower_bound_operands: &[],
+                upper_bound_operands: &[],
+                step: 1,
+                ivar: ValID::IVar(0),
+                body: &inner,
+            };
+            let mut reuse_factors = HashMap::new();
+            let mut trip_counts = HashMap::new();
+            let (distribution, adjustments, reports) =
+                get_reuse_interval_distribution_with_instance_reports(
+                    &tree,
+                    &mut reuse_factors,
+                    &mut trip_counts,
+                    1,
+                    &context,
+                );
+            let distribution = distribution
+                .into_iter()
+                .map(|(interval, portion)| {
+                    (
+                        substitute_block_size(&interval, 4),
+                        substitute_block_size(&portion, 4),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let numeric = get_ri_distribution(&distribution);
+
+            assert_eq!(numeric.len(), 5, "distribution: {numeric:?}");
+            assert_eq!(numeric[1].0, 1);
+            assert_close(numeric[1].1, 1.0 / 7.0);
+            assert_eq!(numeric[2].0, 7);
+            assert_close(numeric[2].1, 5.0 / 7.0);
+            assert_eq!(numeric[3].0, 133); // 7 * TC_j - 7.
+            assert_close(numeric[3].1, 1.0 / 14.0);
+            assert_eq!(numeric[4].0, 1379); // 7 * (TC_i * TC_j + 1 - b).
+            assert_close(numeric[4].1, 1.0 / 14.0);
+
+            assert_eq!(reports.len(), 7);
+            assert_eq!(reports[6].distribution.len(), 1);
+            let store_report = substitute_instance_report_block_size(&reports[6], 4);
+            assert_eq!(
+                constant_poly_to_isize(&store_report.distribution[0].0),
+                Some(1)
+            );
+            assert_eq!(store_report.distribution[0].1, ratio(1, 7, &context));
+            let store_adjustment = store_report
+                .adjustment
+                .as_ref()
+                .expect("the unapplied store candidate must be reported");
+            assert_eq!(constant_poly_to_isize(&store_adjustment.0), Some(1));
+            assert_eq!(store_adjustment.1, ratio(1, 7, &context));
+            assert!(!store_report.adjustment_applied);
+            assert_eq!(adjustments.len(), 2); // One for A and one for the B load.
         });
     }
 }

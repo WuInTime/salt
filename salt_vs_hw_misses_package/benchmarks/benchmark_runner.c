@@ -13,7 +13,7 @@ extern kernel_t constant_context_lookup_kernel;
 extern kernel_t constant_matrix_matrix_kernel;
 extern kernel_t constant_matrix_vector_kernel;
 extern kernel_t constant_rowwise_softmax_max_kernel;
-extern kernel_t constant_stencil_kernel;
+extern kernel_t constant_stencil5pt_kernel;
 extern kernel_t tiled_3d_tensor_vector_kernel;
 extern kernel_t tiled_4d_tensor_kernel;
 extern kernel_t tiled_attention_score_kernel;
@@ -45,7 +45,7 @@ static benchmark_entry_t benchmarks[] = {
     {"tiled_matrix_matrix", &tiled_matrix_matrix_kernel},
     {"tiled_matrix_vector", &tiled_matrix_vector_kernel},
     {"tiled_rowwise_softmax_max", &tiled_rowwise_softmax_max_kernel},
-    {"orig_stencil", &constant_stencil_kernel},
+    {"orig_stencil", &constant_stencil5pt_kernel},
 };
 
 static const size_t benchmark_count = sizeof(benchmarks) / sizeof(benchmarks[0]);

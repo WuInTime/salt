@@ -8,7 +8,7 @@ data/
 data.tar.zst
 *.tar.zst
 results/
-results.old/
+results.old*/
 artifact-results/
 full-results/
 /run*
@@ -27,9 +27,9 @@ flamegraph.svg
 *.db-journal
 *.log
 /*.png
-/*.svg
 result.txt
 .codex
 benchmarks/mlir-contractions/results.old*
 some_notes.txt
 *pact26-ae-v1.tar.gz
+salt_vs_hw_misses_package/benchmarks/bin

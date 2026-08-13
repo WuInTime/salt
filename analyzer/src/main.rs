@@ -415,8 +415,8 @@ fn main_entry() -> anyhow::Result<()> {
             //  utils::walk_tree_print_converted_affine_map(tree, 0)?;
             let mut rf = HashMap::new();
             let mut tc = HashMap::new();
-            let (ri_dist, curve_adjustments) =
-                salt::get_reuse_interval_distribution_with_adjustments(
+            let (ri_dist, curve_adjustments, instance_reports) =
+                salt::get_reuse_interval_distribution_with_instance_reports(
                     tree, &mut rf, &mut tc, 1, context,
                 );
             let ri_dist_vec = ri_dist
@@ -445,10 +445,18 @@ fn main_entry() -> anyhow::Result<()> {
                     .collect::<Vec<_>>(),
                 None => curve_adjustments,
             };
+            let instance_reports = match block_size {
+                Some(block_size) => instance_reports
+                    .iter()
+                    .map(|report| salt::substitute_instance_report_block_size(report, *block_size))
+                    .collect::<Vec<_>>(),
+                None => instance_reports,
+            };
             if options.json {
                 let output = salt::create_json_output(
                     &ri_dist_vec,
                     &curve_adjustments,
+                    &instance_reports,
                     access_cnt,
                     tc.values(),
                     start_time,
@@ -456,7 +464,14 @@ fn main_entry() -> anyhow::Result<()> {
                 writeln!(writer, "{output}")?;
             } else {
                 let table = create_table(&ri_dist_vec);
+                writeln!(writer, "Kernel-level RI distribution:")?;
                 writeln!(writer, "{table}")?;
+                let instance_table = salt::create_instance_table(&instance_reports);
+                writeln!(
+                    writer,
+                    "Reference-instance RI distributions and adjustments:"
+                )?;
+                writeln!(writer, "{instance_table}")?;
                 let total_count = salt::get_total_count(access_cnt, tc.values());
                 writeln!(writer, "Total: {total_count}")?;
                 let distribution =
