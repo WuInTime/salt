@@ -1,5 +1,9 @@
 # The 17 benchmark sources and PMC collector
 
+The portable Figure 4 reproduction and the optional local-measurement procedure
+are documented in the parent `README.md`. This file describes the native
+benchmark runner and collector themselves.
+
 This directory ships the exact project C implementations for the 16 benchmarks
 shown in the supplied miss-count figure, plus the original stencil benchmark:
 
@@ -12,13 +16,8 @@ orig_context_lookup            tiled_context_lookup
 orig_matrix_matrix             tiled_matrix_matrix
 orig_matrix_vector             tiled_matrix_vector
 orig_rowwise_softmax_max       tiled_rowwise_softmax_max
-orig_stencil
+orig_stencil5pt
 ```
-
-In the original source naming convention, the `orig_*` programs are stored as
-`constant_*.c`. `orig_stencil` therefore maps to
-`kernels/mlir/orig/constant_stencil.c`. Tiled stencil is deliberately not in
-this 17-program set.
 
 Build and confirm the manifest:
 
@@ -39,11 +38,14 @@ For a less noisy result, collect three runs and retain their median:
 python3 collect_pmc.py --cpu 1 --repeats 3
 ```
 
-The default output is `../data/pmu_results.csv`. Initialization and
+The default output is `../data/pmu_results_17_new.csv`. Initialization and
 cleanup are outside the measured interval; only `kernel->execute()` is counted.
 Counter semantics and permissions are documented in
 `../pmc_measurement/README.md`.
 
-PMC values are machine- and run-dependent. Use the same CPU, affinity, compiler
-flags, frequency/prefetch configuration, and operating-system conditions when
-comparing a new collection with the frozen paper data.
+PMC values are machine- and run-dependent. Pinning selects a logical CPU but
+does not isolate its physical core. Before measuring, ensure every sibling
+hyperthread on the selected core is offline; see the parent README for topology
+checks. Use the same CPU, affinity, compiler flags, frequency/prefetch
+configuration, and operating-system conditions when comparing a new collection
+with the frozen paper data.

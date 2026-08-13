@@ -87,6 +87,7 @@ enum Method {
         /// barvinok options
         barvinok_arg: Vec<String>,
         #[arg(short = 'b', long, default_value = "1")]
+        /// cache-line capacity in target elements (not bytes)
         block_size: usize,
         #[arg(short = 'l', long)]
         symbol_lowerbound: Vec<i32>,
@@ -98,7 +99,7 @@ enum Method {
     /// Use the PerfectTiling algorithm to compute the polyhedral model
     Salt {
         #[arg(short = 'b', long)]
-        /// block size, if not specified, it will be represented symbolically
+        /// cache-line capacity in target elements (not bytes); symbolic if omitted
         block_size: Option<usize>,
     },
 }

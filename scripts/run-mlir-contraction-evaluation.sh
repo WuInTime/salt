@@ -154,7 +154,7 @@ for input in "${inputs[@]}"; do
 done
 
 echo "Generating log- and linear-scale figures..."
-MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/autolala-matplotlib} \
+MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/salt-matplotlib} \
 python3 "$repository_root/scripts/graph_contractions_salt_vs_cg.py" \
     --fully-db "$fully_db" \
     --8way-db "$way8_db" \
@@ -170,7 +170,7 @@ if ! $smoke_test; then
         --simulation-db "$fully_db" \
         --cache-limit-bytes "$cache_limit_bytes" \
         --out "$results_dir/timing-selected.json"
-    MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/autolala-matplotlib} \
+    MPLCONFIGDIR=${MPLCONFIGDIR:-/tmp/salt-matplotlib} \
     python3 "$repository_root/scripts/timing_selected.py" \
         --data "$results_dir/timing-selected.json" \
         --out "$results_dir/timing-selected.svg"

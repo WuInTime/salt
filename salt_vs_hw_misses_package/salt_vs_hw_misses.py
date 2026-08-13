@@ -28,11 +28,11 @@ from scipy import stats
 HERE = Path(__file__).resolve().parent
 REPOSITORY_ROOT = HERE.parent
 DEFAULT_PMC = HERE / "data" / "pmu_i7-7700_result.csv"
-DEFAULT_RESULTS = HERE / "data" / "salt_vs_hw_misses_results.csv"
-DEFAULT_PLOT = HERE / "output" / "salt_vs_hw_misses_new.svg"
-DEFAULT_SALT_JSON_DIR = (
-    REPOSITORY_ROOT / "results" / "mlir-contractions" / "work" / "constant"
-)
+DEFAULT_OUTPUT_DIR = REPOSITORY_ROOT / "results" / "salt-vs-hardware"
+DEFAULT_RESULTS = DEFAULT_OUTPUT_DIR / "salt_vs_hw_misses_results.csv"
+DEFAULT_PLOT = DEFAULT_OUTPUT_DIR / "salt_vs_hw_misses.svg"
+DEFAULT_SALT_JSON_DIR = DEFAULT_OUTPUT_DIR / "salt-json"
+DEFAULT_ANALYZER = REPOSITORY_ROOT / "target" / "release" / "analyzer"
 CONTRACTION_DIR = REPOSITORY_ROOT / "benchmarks" / "mlir-contractions" / "constant"
 STENCIL_INPUT = REPOSITORY_ROOT / "benchmarks" / "examples" / "const_stencil5pt.mlir"
 
@@ -55,6 +55,11 @@ BENCHMARKS = (
     "tiled_rowwise_softmax_max",
     "orig_stencil5pt",
 )
+SMOKE_BENCHMARKS = (
+    "orig_3d_tensor_vector",
+    "tiled_3d_tensor_vector",
+    "orig_stencil5pt",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,6 +72,17 @@ def parse_args() -> argparse.Namespace:
             "directory in which to generate *-salt.json files "
             f"(default: {DEFAULT_SALT_JSON_DIR})"
         ),
+    )
+    parser.add_argument(
+        "--analyzer",
+        type=Path,
+        default=DEFAULT_ANALYZER,
+        help=f"prebuilt SALT analyzer (default: {DEFAULT_ANALYZER})",
+    )
+    parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="run a representative original, tiled, and stencil subset",
     )
     parser.add_argument(
         "--pmc",
@@ -83,6 +99,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--plot-output", type=Path, default=DEFAULT_PLOT)
     parser.add_argument("--cache-size-bytes", type=int, default=32768)
     parser.add_argument("--cache-line-bytes", type=int, default=64)
+    parser.add_argument(
+        "--elements-per-cache-line",
+        type=int,
+        default=8,
+        help="target elements per modeled cache line (default: 8)",
+    )
     return parser.parse_args()
 
 
@@ -110,47 +132,52 @@ def mlir_input_for(program: str) -> Path:
     raise ValueError(f"unknown benchmark name: {program}")
 
 
-def generate_salt_jsons(root: Path) -> None:
-    missing_inputs = [mlir_input_for(program) for program in BENCHMARKS]
+def generate_salt_jsons(
+    root: Path,
+    analyzer: Path,
+    benchmarks: tuple[str, ...],
+    elements_per_cache_line: int,
+) -> None:
+    if not analyzer.is_file():
+        raise FileNotFoundError(
+            f"analyzer does not exist: {analyzer}; build it with "
+            "cargo build --locked --release -p analyzer --bin analyzer"
+        )
+
+    missing_inputs = [mlir_input_for(program) for program in benchmarks]
     missing_inputs = [path for path in missing_inputs if not path.is_file()]
     if missing_inputs:
         raise FileNotFoundError(
             "missing MLIR inputs: " + ", ".join(map(str, missing_inputs))
         )
 
-    for program in BENCHMARKS:
+    for program in benchmarks:
         input_path = mlir_input_for(program)
         output_dir = root / "tiled" if program.startswith("tiled_") else root
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / json_name_for(program)
+
         print(f"Generating SALT prediction for {program}...")
         subprocess.run(
             [
-                "cargo",
-                "run",
-                "--locked",
-                "--release",
-                "--bin",
-                "analyzer",
-                "--",
+                str(analyzer),
                 "-i",
                 str(input_path),
                 "--json",
                 "-o",
                 str(output_path),
                 "salt",
-                "--block-size=8",
+                f"--block-size={elements_per_cache_line}",
             ],
-            cwd=REPOSITORY_ROOT,
             check=True,
         )
 
 
-def index_json_files(root: Path) -> dict[str, Path]:
+def index_json_files(root: Path, benchmarks: tuple[str, ...]) -> dict[str, Path]:
     if not root.is_dir():
         raise FileNotFoundError(f"SALT JSON directory does not exist: {root}")
 
-    expected = {json_name_for(program) for program in BENCHMARKS}
+    expected = {json_name_for(program) for program in benchmarks}
     matches: dict[str, list[Path]] = {}
     for path in root.rglob("*.json"):
         if path.name in expected:
@@ -258,17 +285,19 @@ def load_pmc(path: Path) -> dict[str, float]:
     return values
 
 
-def derive_results(args: argparse.Namespace) -> list[dict[str, Any]]:
+def derive_results(
+    args: argparse.Namespace, benchmarks: tuple[str, ...]
+) -> list[dict[str, Any]]:
     if args.cache_size_bytes <= 0 or args.cache_line_bytes <= 0:
         raise ValueError("cache and line sizes must be positive")
     cache_lines = args.cache_size_bytes / args.cache_line_bytes
     pmc = load_pmc(args.pmc)
-    json_files = index_json_files(args.salt_json_dir)
+    json_files = index_json_files(args.salt_json_dir, benchmarks)
 
-    missing_pmc = [program for program in BENCHMARKS if program not in pmc]
+    missing_pmc = [program for program in benchmarks if program not in pmc]
     missing_json = [
         json_name_for(program)
-        for program in BENCHMARKS
+        for program in benchmarks
         if json_name_for(program) not in json_files
     ]
     if missing_pmc:
@@ -280,7 +309,7 @@ def derive_results(args: argparse.Namespace) -> list[dict[str, Any]]:
         )
 
     rows: list[dict[str, Any]] = []
-    for program in BENCHMARKS:
+    for program in benchmarks:
         json_path = json_files[json_name_for(program)]
         ratios, points, total_count = load_salt_curve(json_path)
         ratio = miss_ratio_at(ratios, points, cache_lines)
@@ -353,9 +382,18 @@ def plot_results(rows: list[dict[str, Any]], path: Path) -> tuple[float, float]:
 
 def main() -> int:
     args = parse_args()
+    if args.elements_per_cache_line <= 0:
+        raise ValueError("--elements-per-cache-line must be positive")
     args.salt_json_dir = args.salt_json_dir.resolve()
-    generate_salt_jsons(args.salt_json_dir)
-    rows = derive_results(args)
+    args.analyzer = args.analyzer.resolve()
+    benchmarks = SMOKE_BENCHMARKS if args.smoke_test else BENCHMARKS
+    generate_salt_jsons(
+        args.salt_json_dir,
+        args.analyzer,
+        benchmarks,
+        args.elements_per_cache_line,
+    )
+    rows = derive_results(args, benchmarks)
     write_results(rows, args.results_output)
     mare, pearson_r = plot_results(rows, args.plot_output)
     print(

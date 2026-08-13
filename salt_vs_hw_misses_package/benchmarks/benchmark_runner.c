@@ -45,7 +45,7 @@ static benchmark_entry_t benchmarks[] = {
     {"tiled_matrix_matrix", &tiled_matrix_matrix_kernel},
     {"tiled_matrix_vector", &tiled_matrix_vector_kernel},
     {"tiled_rowwise_softmax_max", &tiled_rowwise_softmax_max_kernel},
-    {"orig_stencil", &constant_stencil5pt_kernel},
+    {"orig_stencil5pt", &constant_stencil5pt_kernel},
 };
 
 static const size_t benchmark_count = sizeof(benchmarks) / sizeof(benchmarks[0]);

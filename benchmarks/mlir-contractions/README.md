@@ -3,10 +3,12 @@
 This directory contains the eight original and tile-size-8 MLIR contraction
 benchmarks used to compare SALT miss-count predictions with Cachegrind
 simulations of fully associative, 8-way, and 12-way L1 data caches.
+For the complete evaluator workflow and paper-result map, start with the
+repository-root `README.md`.
 
 ## Dependencies
 
-- Rust and Cargo (the repository currently builds with nightly Rust 1.99)
+- Rust and Cargo (use the toolchain pinned by `rust-toolchain`)
 - LLVM/MLIR 21, including `mlir-opt`
 - `clang++` with static-linking support
 - Valgrind with Cachegrind
@@ -33,7 +35,7 @@ RESULTS_DIR=/tmp/mlir-contraction-smoke \
 ```
 
 This tests the original and tiled 3D tensor-vector kernel with a reduced 1 KiB
-cache-size sweep. It exercises MLIR tiling, SALT, minimal executable emission,
+cache-size sweep. It exercises MLIR input staging, SALT, executable emission,
 all three Cachegrind organizations, SQLite output, and both plot variants.
 
 ## Full evaluation
@@ -64,8 +66,8 @@ Results are written to `results/mlir-contractions/`:
 - `miss_count_comparison_all_programs_linear.svg`
 - `work/constant/` (staged MLIR inputs and generated SALT JSON)
 
-The script copies the original MLIR into `RESULTS_DIR/work`, regenerates tiled
-MLIR and SALT JSON there, and points
+The script copies the original and checked-in tiled MLIR into
+`RESULTS_DIR/work`, generates SALT JSON there, and points
 `scripts/graph_contractions_salt_vs_cg.py` at that staged tree.
 Checked-in benchmark artifacts are therefore not modified. Use an empty
 `RESULTS_DIR`: the script refuses to add records to existing databases, which
@@ -73,7 +75,8 @@ prevents accidental mixing of reduced and full sweeps.
 
 ## Individual stages
 
-Tile an input:
+The artifact uses the checked-in tile-size-8 inputs. For reference, an
+equivalent tiling pipeline is:
 
 ```bash
 mlir-opt constant_input.mlir \
@@ -84,17 +87,18 @@ mlir-opt constant_input.mlir \
   -o tiled_output.mlir
 ```
 
-Generate a SALT curve:
+Generate a SALT curve with the already built analyzer:
 
+<!-- cargo run --locked --release -p analyzer --no-default-features --bin analyzer -- \ -->
 ```bash
-cargo run --locked --release -p analyzer --no-default-features --bin analyzer -- \
+target/release/analyzer \
   -i input.mlir --json -o output.json salt --block-size=8
 ```
 
 Regenerate plots from existing databases and SALT JSON:
 
 ```bash
-MPLCONFIGDIR=/tmp/autolala-matplotlib \
+MPLCONFIGDIR=/tmp/salt-matplotlib \
   python3 scripts/graph_contractions_salt_vs_cg.py
 ```
 
@@ -127,7 +131,7 @@ bash scripts/run-mlir-contraction-evaluation.sh
 To regenerate only the selected figure from those measured results:
 
 ```bash
-MPLCONFIGDIR=/tmp/autolala-matplotlib \
+MPLCONFIGDIR=/tmp/salt-matplotlib \
 python3 scripts/timing_selected.py \
   --data results/mlir-contractions/timing-selected.json \
   --out results/mlir-contractions/timing-selected.svg
@@ -151,10 +155,8 @@ used for the blue bars: the cache runner evaluates cache sizes in parallel, so
 summing those subprocess times would not represent elapsed experiment time.
 
 The simulation series is the complete fully-associative tiled sweep and is the
-slow part. The current working tree changes the runner's fully-associative
-stride from 64 bytes to 4096 bytes. That produces a different, much shorter
-experiment than the historical hard-coded timings; the manifest's observed
-cache-size list makes this difference explicit.
+slow part. The timing manifest records the cache-size list observed in the
+simulation database so reviewers can verify the measured configuration.
 
 ## Methodology notes and known limitations
 

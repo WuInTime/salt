@@ -121,7 +121,7 @@ def main():
         if not args.simulation_db:
             parser.error("--simulation-db is required with --simulation-times")
 
-    with tempfile.TemporaryDirectory(prefix="autolala-selected-timing-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="salt-selected-timing-") as temporary:
         temporary_root = Path(temporary)
         for display_name, stem in KERNELS.items():
             symbolic = CONTRACTION_ROOT / "symbolic" / f"{stem}.mlir"

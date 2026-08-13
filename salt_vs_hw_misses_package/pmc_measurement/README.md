@@ -1,5 +1,8 @@
 # Standalone L1D read-miss counter
 
+The evaluator-facing Figure 4 workflow is documented in the package's parent
+`README.md`; this file covers the low-level counter interface.
+
 `pmc_l1d_misses.h` extracts the hardware event used for the plot's PMC values
 from the larger PMU framework. It counts the calling thread only and excludes
 kernel and hypervisor activity.

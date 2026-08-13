@@ -81,17 +81,26 @@ COPY raffine/ raffine/
 
 FROM artifact-base AS artifact
 
-# Compile during image construction so dependency failures happen early.
-RUN cargo test --release --locked --workspace --no-run
+# Barvinok's pinned nested submodules still declare repo.or.cz URLs using the
+# legacy git:// transport. Fetch the same repositories and revisions over HTTPS
+# for better firewall compatibility and more reliable evaluator builds.
+RUN git config --global \
+    url."https://repo.or.cz/".insteadOf "git://repo.or.cz/"
+
+# Compile both the evaluator-facing binaries and test harnesses during image
+# construction so the first smoke/reproduction run does not rebuild them.
+RUN cargo test --release --locked --workspace --no-run \
+    && cargo build --release --locked --workspace
 
 ARG ARTIFACT_REVISION=unknown
 ENV ARTIFACT_REVISION="${ARTIFACT_REVISION}"
 
 COPY benchmarks/ benchmarks/
 COPY scripts/ scripts/
+COPY salt_vs_hw_misses_package/ salt_vs_hw_misses_package/
 COPY artifact/ artifact/
-COPY README.md requirements.txt .envrc.example ./
-COPY --chmod=0755 artifact/entrypoint.sh /usr/local/bin/autolala-artifact
+COPY README.md LICENSE requirements.txt .envrc.example ./
+COPY --chmod=0755 artifact/entrypoint.sh /usr/local/bin/salt-artifact
 
-ENTRYPOINT ["autolala-artifact"]
+ENTRYPOINT ["salt-artifact"]
 CMD ["help"]

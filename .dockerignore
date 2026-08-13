@@ -1,63 +1,44 @@
-# Version control
+# Version-control metadata is not needed inside the image. ARTIFACT_REVISION is
+# passed explicitly as a build argument.
 .git
-.gitignore
 .github
+.gitignore
 
-# Secret & environment files (CRITICAL)
+# Local configuration and possible secrets.
 .env
 .envrc
 *.pem
 *.key
 
-# Build artifacts & dependencies
+# Build products and generated evaluation outputs. The image rebuilds these.
 target/
 **/target/
-
-# Local data, cache, & output directories
+build/
+cmake-build-*/
 results/
+results.old*/
 artifact-results/
 full-results/
+salt_vs_hw_misses_package/benchmarks/bin/
 *.log
-.backup
-
-# IDE & Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS metadata
-.DS_Store
-Thumbs.db
-
-some_notes.txt
-
-############ From gitignore **********
-.idea/
-.cache/
-.envrc
-/cmake-build-*
-build
-.clangd
+*.sqlite
+*.sqlite-journal
+*.db
+*.db-journal
+*.tar.gz
 *.tar.zst
-results/
-/run*
-/fix*
-
-# Added by cargo
-target
 perf.data*
 flamegraph.svg
-*.sqlite
-*.sqlite*
-*.sqlite-journal
-/*.db
-*.db-journal
-*.log
-/*.png
 result.txt
-.codex
-some_notes.txt
-results.old*
 
-salt_vs_hw_misses_package/benchmarks/bin
+# Editor, assistant, cache, and operating-system metadata.
+.backup/
+.cache/
+.codex/
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+some_notes.txt

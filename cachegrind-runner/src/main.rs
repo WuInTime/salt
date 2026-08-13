@@ -657,6 +657,7 @@ fn main() {
             let cache_size = args.d1_cache_size;
             (block_size..=cache_size)
                 .step_by(block_size)
+                // TODO: Need to delete * $$ if existed when submitting AE. this is a temporary hack to reduce the number of runs for testing.
                 .collect::<Vec<_>>()
         }
     } else {

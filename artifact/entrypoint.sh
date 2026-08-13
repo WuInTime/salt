@@ -40,10 +40,14 @@ print_versions() {
 import matplotlib
 import numpy
 import pandas
+import scipy
+import seaborn
 
 print("matplotlib", matplotlib.__version__)
 print("numpy", numpy.__version__)
 print("pandas", pandas.__version__)
+print("scipy", scipy.__version__)
+print("seaborn", seaborn.__version__)
 PY
 }
 
@@ -78,9 +82,10 @@ case "${1:-help}" in
     smoke)
         contraction_results="$results_root/contraction-smoke"
         matmul_results="$results_root/matmul-smoke"
+        hardware_results="$results_root/salt-vs-hardware-smoke"
 
         mkdir -p "$results_root"
-        require_absent "$contraction_results" "$matmul_results"
+        require_absent "$contraction_results" "$matmul_results" "$hardware_results"
         print_versions | tee "$results_root/environment-smoke.txt"
 
         RESULTS_DIR="$contraction_results" \
@@ -90,6 +95,9 @@ case "${1:-help}" in
         MAX_CACHE_BLOCKS=8 \
             bash scripts/run-matmul-t0-t2-evaluation.sh
 
+        RESULTS_DIR="$hardware_results" \
+            bash scripts/run-salt-vs-hardware-evaluation.sh --smoke-test
+
         echo "Smoke tests completed successfully."
         echo "Results: $results_root"
         ;;
@@ -97,9 +105,10 @@ case "${1:-help}" in
     reproduce)
         contraction_results="$results_root/mlir-contractions"
         matmul_results="$results_root/matmul-t0-t2"
+        hardware_results="$results_root/salt-vs-hardware"
 
         mkdir -p "$results_root"
-        require_absent "$contraction_results" "$matmul_results"
+        require_absent "$contraction_results" "$matmul_results" "$hardware_results"
         print_versions | tee "$results_root/environment-full.txt"
 
         RESULTS_DIR="$contraction_results" \
@@ -107,6 +116,9 @@ case "${1:-help}" in
 
         RESULTS_DIR="$matmul_results" \
             bash scripts/run-matmul-t0-t2-evaluation.sh
+
+        RESULTS_DIR="$hardware_results" \
+            bash scripts/run-salt-vs-hardware-evaluation.sh
 
         echo "Full evaluation completed."
         echo "Results: $results_root"
@@ -120,14 +132,14 @@ case "${1:-help}" in
     help|--help|-h)
         cat <<'EOF'
 Usage:
-  autolala-artifact test
-  autolala-artifact smoke
-  autolala-artifact reproduce
-  autolala-artifact shell
+  salt-artifact test
+  salt-artifact smoke
+  salt-artifact reproduce
+  salt-artifact shell
 
 Commands:
   test       Check versions and run all Rust tests (free Symbolica mode safe)
-  smoke      Run reduced versions of both experiments
+  smoke      Run reduced versions of all three evaluation workflows
   reproduce  Run the complete evaluation
   shell      Open an interactive shell
 EOF

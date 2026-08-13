@@ -51,7 +51,7 @@ for index in "${!sources[@]}"; do
     python3 "$benchmark_dir/parallel_runner.py" "${cachegrind_args[@]}"
 done
 
-matplotlib_config_dir=${MPLCONFIGDIR:-/tmp/autolala-matplotlib}
+matplotlib_config_dir=${MPLCONFIGDIR:-/tmp/salt-matplotlib}
 mkdir -p "$matplotlib_config_dir"
 env MPLCONFIGDIR="$matplotlib_config_dir" \
     python3 "$repository_root/scripts/graph_mm_salt_vs_cg.py" \
