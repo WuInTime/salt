@@ -1,16 +1,21 @@
 # SALT
 
-SALT is an automatic asymptotic locality analyzer for affine loop programs.
-This repository contains the Rust implementation, benchmark inputs, and three
-drivers that reproduce the evaluation artifacts.
+SALT is an automatic asymptotic locality analyzer for affine loop programs. This repository contains the Rust implementation, benchmark inputs, and three drivers that reproduce the evaluation artifacts.
 
 SALT is distributed under the MIT License; see `LICENSE`.
 
+## Artifact identifiers
+
+- Artifact release: `v1.0.2`
+- Git tag: `pact26-ae-v1.0.2`
+- Zenodo DOI: `10.5281/zenodo.21884197`
+- Trovi: https://trovi.chameleoncloud.org/dashboard/artifacts/fa2befc9-24de-442a-9fde-2141e0502eab
+
+The Git tag and Zenodo DOI identify the artifact release used for evaluation. The Trovi entry provides the corresponding record for the PACT 2026 Chameleon Reproducibility Challenge.
+
 ## Artifact overview
 
-The artifact has three evaluation workflows. These scripts build the required
-binaries, run the analyses and Cachegrind simulations, and generate the plots
-and intermediate data used by the evaluation:
+The artifact has three evaluation workflows. These scripts build the required binaries, run the analyses and Cachegrind simulations, and generate the plots and intermediate data used by the evaluation:
 
 | Workflow | Command | Output directory |
 | --- | --- | --- |
@@ -18,9 +23,7 @@ and intermediate data used by the evaluation:
 | MLIR contractions | `./scripts/run-mlir-contraction-evaluation.sh` | `results/mlir-contractions/` |
 | SALT vs. hardware L1D misses | `./scripts/run-salt-vs-hardware-evaluation.sh` | `results/salt-vs-hardware/` |
 
-Generated results and Cargo build products are intentionally excluded from
-version control. Each workflow can write somewhere else by setting
-`RESULTS_DIR`.
+Generated results and Cargo build products are intentionally excluded from version control. Each workflow can write somewhere else by setting `RESULTS_DIR`.
 
 Documentation is organized by audience:
 
@@ -33,19 +36,30 @@ Documentation is organized by audience:
 | `salt_vs_hw_misses_package/benchmarks/README.md` | The 17 native kernels and PMC collector behavior |
 | `salt_vs_hw_misses_package/pmc_measurement/README.md` | Low-level Linux PMU interface and permissions |
 
+## Hardware and resource requirements
+
+For portable reproduction using the checked-in reference measurements:
+
+- Architecture: x86-64
+- CPU: no particular model is required
+- Memory: 8 GiB minimum; 16 GiB recommended
+- Free disk space: approximately 25 GiB for the Docker build and 1 GiB for the complete results
+- GPU: not required
+- Network: required only during the initial Docker build to download dependencies
+
+The reference Figure 4 hardware-counter data were collected on an Intel Core i7-7700. Reproducing those exact measurements does not require an i7-7700 because the reference measurements are included in the artifact. Optional collection of fresh hardware-counter data has additional machine-specific requirements described under [Figure 4: reference data or local PMCs](#figure-4-reference-data-or-local-pmcs).
+
 ## Recommended Docker workflow
 
-Docker is the recommended evaluator path. The image uses Ubuntu 24.04, the
-official LLVM/MLIR 21 packages, the pinned Rust toolchain and the Python
-versions in `requirements.txt`.
+Docker is the recommended evaluator path. The image uses Ubuntu 24.04, the official LLVM/MLIR 21 packages, the pinned Rust toolchain and the Python versions in `requirements.txt`.
 
 Build the image from the repository root:
 
 ```bash
-docker build --progress=plain \
-  --build-arg ARTIFACT_REVISION="$(git rev-parse HEAD)" \
-  -t salt-artifact:ae .
+docker build --progress=plain -t salt-artifact:ae .
 ```
+
+The image defaults `ARTIFACT_REVISION` to `pact26-ae-v1.0.2`, so this command works from the extracted Zenodo archive, where Git metadata is intentionally absent. The value is recorded as source provenance in generated timing data; it does not affect the measurements. Developers building another revision can override it with `--build-arg ARTIFACT_REVISION=<tag-or-commit>`.
 
 Use `--no-cache` once before submission to verify a completely clean build.
 
@@ -55,8 +69,7 @@ Check the toolchain and run the Rust test suite:
 docker run --rm salt-artifact:ae test
 ```
 
-The `test` command isolates analyzer unit tests into separate processes so the
-suite also works with Symbolica's free restricted mode.
+The `test` command isolates analyzer unit tests into separate processes so the suite also works with Symbolica's free restricted mode.
 
 Run all three reduced evaluation workflows and retain their results on the host:
 
@@ -67,12 +80,9 @@ docker run --rm --init \
   salt-artifact:ae smoke
 ```
 
-The mounted directory must not already contain `contraction-smoke/`,
-`matmul-smoke/`, or `salt-vs-hardware-smoke/`; this prevents results from
-different runs from being mixed.
+The mounted directory must not already contain `contraction-smoke/`, `matmul-smoke/`, or `salt-vs-hardware-smoke/`; this prevents results from different runs from being mixed.
 
-After validating the smoke run, start the complete evaluation with an empty
-directory:
+After validating the smoke run, start the complete evaluation with an empty directory:
 
 ```bash
 mkdir full-results
@@ -81,8 +91,7 @@ docker run --rm --init \
   salt-artifact:ae reproduce
 ```
 
-If a separately obtained Symbolica license is required, pass the existing
-shell variable at runtime rather than storing it in the image:
+If a separately obtained Symbolica license is required, pass the existing shell variable at runtime rather than storing it in the image:
 
 ```bash
 docker run --rm --init \
@@ -91,9 +100,23 @@ docker run --rm --init \
   salt-artifact:ae smoke
 ```
 
-The container records its tool versions in `environment-smoke.txt` or
-`environment-full.txt` alongside the results. Run `docker run --rm
-salt-artifact:ae help` for all container commands.
+The container records its tool versions in `environment-smoke.txt` or `environment-full.txt` alongside the results. Run `docker run --rm salt-artifact:ae help` for all container commands.
+
+## Typical runtimes
+
+The following approximate wall-clock times are based on warm runs on an Intel Core i7-7700 with four cores, eight hardware threads, and 32 GiB of memory:
+
+| Phase | Approximate time |
+| --- | ---: |
+| Initial `docker build` | Budget 1–2 hours; not measured in this run |
+| `docker run --rm salt-artifact:ae test` | 1.5 minutes |
+| `docker run ... salt-artifact:ae smoke` | 30 seconds |
+| Full matrix-multiplication workflow | 1.5 minutes |
+| Full contraction workflow | Approximately 8 hours (rough estimate from a recorded run) |
+| Figure 4 processing with the included measurements | Less than 5 seconds |
+| Complete `reproduce` workflow, excluding image build | Approximately 8–9 hours |
+
+These times vary substantially with CPU performance, available hardware threads, system load, network speed, and Docker cache state. The initial image build downloads the complete toolchain and compiles the Rust workspace. During `reproduce`, the contraction Cachegrind sweeps are the only multi-hour phase and dominate the overall runtime; the other two workflows should finish within a few minutes. Fresh Figure 4 hardware-counter collection is optional and is not included in these estimates.
 
 ## Requirements
 
@@ -108,9 +131,7 @@ The direct, non-containerized workflow requires:
 - Valgrind with Cachegrind;
 - Python 3 with the packages pinned in `requirements.txt`.
 
-Configure LLVM for the Rust bindings. The exact library directory can vary by
-distribution; `.envrc.example` contains the tested Fedora layout. A typical
-LLVM installation under `/usr/lib/llvm-21` uses:
+Configure LLVM for the Rust bindings. The exact library directory can vary by distribution; `.envrc.example` contains the tested Fedora layout. A typical LLVM installation under `/usr/lib/llvm-21` uses:
 
 ```bash
 export PATH="/usr/lib/llvm-21/bin:$PATH"
@@ -129,28 +150,19 @@ python3 -m pip install --upgrade pip
 python3 -m pip install -r requirements.txt
 ```
 
-Cargo commands use the committed `Cargo.lock` and pass `--locked`. The first
-build downloads Rust dependencies and can take several minutes.
+Cargo commands use the committed `Cargo.lock` and pass `--locked`. The first build downloads Rust dependencies and can take several minutes.
 
-The Docker image also installs the pinned toolchain's `rustfmt` component.
-This is required by the pinned Barvinok binding generator, not only for source
-formatting.
+The Docker image also installs the pinned toolchain's `rustfmt` component. This is required by the pinned Barvinok binding generator, not only for source formatting.
 
 ## Symbolica
 
-SALT uses Symbolica for symbolic polynomial manipulation. No Symbolica
-license key is included in this artifact. The evaluation drivers set
-`SYMBOLICA_HIDE_BANNER=1` and use Symbolica's free restricted mode, which is
-limited to one instance and one core per device. Make sure another unlicensed
-Symbolica process is not running on the evaluation machine.
+SALT uses Symbolica for symbolic polynomial manipulation. No Symbolica license key is included in this artifact. The evaluation drivers set `SYMBOLICA_HIDE_BANNER=1` and use Symbolica's free restricted mode, which is limited to one instance and one core per device. Make sure another unlicensed Symbolica process is not running on the evaluation machine.
 
-To use a separately obtained license, set `SYMBOLICA_LICENSE` only in the local
-environment. Never add a key to this repository or an artifact archive.
+To use a separately obtained license, set `SYMBOLICA_LICENSE` only in the local environment. Never add a key to this repository or an artifact archive.
 
 ## Quick validation
 
-Run reduced experiments first. The commands below use temporary output
-directories and do not modify the checked-in benchmark inputs.
+Run reduced experiments first. The commands below use temporary output directories and do not modify the checked-in benchmark inputs.
 
 ```bash
 RESULTS_DIR=/tmp/salt-matmul-smoke \
@@ -168,27 +180,31 @@ RESULTS_DIR=/tmp/salt-hardware-smoke \
 ./scripts/run-salt-vs-hardware-evaluation.sh --smoke-test
 ```
 
-The matrix-multiplication check runs all three loop organizations over a small
-cache range. The contraction check runs the original and tiled 3D
-tensor-vector kernels, all three cache organizations, and both plot variants.
-The SALT-vs-hardware check analyzes an original kernel, its tiled form, and the
-stencil; it then checks the frozen PMC input and generates the derived CSV and
-plot. It should report three benchmarks, MARE approximately `0.0072`, and
-Pearson correlation approximately `1.0000`. Fresh PMU collection is
-deliberately not part of the portable smoke test.
+The matrix-multiplication check runs all three loop organizations over a small cache range. The contraction check runs the original and tiled 3D tensor-vector kernels, all three cache organizations, and both plot variants. The SALT-vs-hardware check analyzes an original kernel, its tiled form, and the stencil; it then checks the frozen PMC input and generates the derived CSV and plot. It should report three benchmarks, MARE approximately `0.0072`, and Pearson correlation approximately `1.0000`. Fresh PMU collection is deliberately not part of the portable smoke test.
+
+The smoke workflow evaluates only three representative hardware-comparison benchmarks, so its MARE (approximately `0.0072`) is not expected to match the full 17-benchmark Figure 4 MARE (approximately `0.0168`).
+
+## Reproduction criteria
+
+A reproduction is considered successful when:
+
+1. `docker run --rm salt-artifact:ae test` completes successfully.
+2. The `smoke` workflow completes without error and produces the three reduced result directories.
+3. The complete workflows generate the artifacts listed under [Paper claims and generated artifacts](#paper-claims-and-generated-artifacts).
+4. For the packaged Figure 4 reference data, the full workflow reports 17 benchmarks, MARE approximately `0.0168`, and Pearson correlation approximately `0.9996`.
+5. Small rendering differences in generated plots are acceptable if the underlying numeric results match the checks above.
+6. Absolute timing values are machine- and load-dependent and are not expected to match the submitted measurements exactly. Figure 3 reproduction should preserve the reported qualitative comparison rather than identical wall-clock times.
+7. Fresh PMU measurements are machine-dependent and are not expected to match the packaged Intel Core i7-7700 measurements. The checked-in measurements are the reference input for portable reproduction.
 
 ## Figure 4: reference data or local PMCs
 
-The normal artifact command uses the checked-in measurements from an Intel
-Core i7-7700 with hyperthreading disabled. It does not access the evaluator's
-hardware counters:
+The normal artifact command uses the checked-in measurements from an Intel Core i7-7700 with hyperthreading disabled. It does not access the evaluator's hardware counters:
 
 ```bash
 ./scripts/run-salt-vs-hardware-evaluation.sh
 ```
 
-To perform the optional experiment on the current machine, first choose a
-logical CPU whose sibling hyperthread is offline, then collect three repeats:
+To perform the optional experiment on the current machine, first choose a logical CPU whose sibling hyperthread is offline, then collect three repeats:
 
 ```bash
 mkdir -p results/salt-vs-hardware-local
@@ -206,19 +222,11 @@ RESULTS_DIR=results/salt-vs-hardware-local \
   --pmc results/salt-vs-hardware-local/pmu.csv
 ```
 
-The defaults model a 32 KiB cache, 64-byte lines, and eight 8-byte elements per
-line. If the measured L1D geometry differs, pass the corresponding
-`--cache-size-bytes`, `--cache-line-bytes`, and
-`--elements-per-cache-line` values. Fresh PMC results are machine-dependent and
-are not expected to match the packaged i7-7700 values. PMU permissions, CPU
-topology checks, and hyperthread-isolation requirements are detailed in
-`salt_vs_hw_misses_package/README.md`.
+The defaults model a 32 KiB cache, 64-byte lines, and eight 8-byte elements per line. If the measured L1D geometry differs, pass the corresponding `--cache-size-bytes`, `--cache-line-bytes`, and `--elements-per-cache-line` values. Fresh PMC results are machine-dependent and are not expected to match the packaged i7-7700 values. PMU permissions, CPU topology checks, and hyperthread-isolation requirements are detailed in `salt_vs_hw_misses_package/README.md`.
 
 ## Full evaluation
 
-Start with empty output directories. The contraction driver refuses to append
-to existing SQLite databases so that results from different configurations
-cannot be mixed.
+Start with empty output directories. The contraction driver refuses to append to existing SQLite databases so that results from different configurations cannot be mixed.
 
 ```bash
 ./scripts/run-mlir-contraction-evaluation.sh
@@ -226,9 +234,7 @@ cannot be mixed.
 ./scripts/run-salt-vs-hardware-evaluation.sh
 ```
 
-The full contraction experiment runs the original and tiled forms of eight
-kernels. Runtime depends strongly on CPU count and machine load; the
-Cachegrind sweeps are the dominant cost.
+The full contraction experiment runs the original and tiled forms of eight kernels. Runtime depends strongly on CPU count and machine load; the Cachegrind sweeps are the dominant cost.
 
 The matrix-multiplication workflow generates:
 
@@ -253,9 +259,7 @@ The SALT-vs-hardware workflow generates:
 
 ## Paper claims and generated artifacts
 
-The following table is the evaluator-facing map from the paper to the files
-produced by the full workflows. Figure numbering refers to the submitted
-paper.
+The following table is the evaluator-facing map from the paper to the files produced by the full workflows. Figure numbering refers to the submitted paper.
 
 | Paper result | Reproduction command | Generated artifact | Supported claim |
 | --- | --- | --- | --- |
@@ -264,24 +268,23 @@ paper.
 | Figure 3 | `./scripts/run-mlir-contraction-evaluation.sh` | `results/mlir-contractions/timing-selected.svg` with numeric data in `timing-selected.json` and `timing-simulation-wall.tsv` | SALT analysis time is compared with the measured simulation time for the selected contraction kernels. |
 | Figure 4 | `./scripts/run-salt-vs-hardware-evaluation.sh` | `results/salt-vs-hardware/salt_vs_hw_misses.svg` with numeric data in `salt_vs_hw_misses_results.csv` | SALT estimates are compared with measured L1D load misses for 17 kernels. The default workflow uses the checked-in Intel Core i7-7700 measurements. |
 
-For Figure 4, the reference data should produce 17 points, MARE approximately
-`0.0168`, and Pearson correlation approximately `0.9996` (displayed as `1.000`
-in the plot). Small rendering differences do not change these numeric checks.
+For Figure 4, the reference data should produce 17 points, MARE approximately `0.0168`, and Pearson correlation approximately `0.9996` (displayed as `1.000` in the plot). These values are calculated from the 17-row reference dataset shipped in this release. The unrounded MARE is `0.016824`, which rounds to `0.017` at three decimal places and is consistent with the `0.0170` shown in the submitted Figure 4. The `0.0202` stated in Section 5.4 is a stale reporting value that will be corrected in the final paper. Small rendering differences do not change these numeric checks.
 
-The artifact supports regeneration of all four figures and their intermediate
-numeric data. Fresh collection of Figure 4's hardware counters is not claimed
-to be machine-independent: the values depend on the processor, PMU event,
-compiler, and system configuration. The checked-in i7-7700 CSV is therefore
-the reference input for reproduction. Instructions for an optional fresh
-collection, including the CPU-affinity and SMT requirements, are in
-`salt_vs_hw_misses_package/README.md`.
+The artifact supports regeneration of all four figures and their intermediate numeric data. Fresh collection of Figure 4's hardware counters is not claimed to be machine-independent: the values depend on the processor, PMU event, compiler, and system configuration. The checked-in i7-7700 CSV is therefore the reference input for reproduction. Instructions for an optional fresh collection, including the CPU-affinity and SMT requirements, are in `salt_vs_hw_misses_package/README.md`.
 
-Detailed configurations, methodology notes, and individual-stage commands are
-in:
+Detailed configurations, methodology notes, and individual-stage commands are in:
 
 - `benchmarks/matmul-t0-t2/README.md`;
 - `benchmarks/mlir-contractions/README.md`;
 - `salt_vs_hw_misses_package/README.md`.
+
+## Troubleshooting
+
+- **Docker build fails while downloading dependencies.** Verify network access and retry the build. A clean `--no-cache` build is recommended before submission validation, but cached rebuilds are appropriate during ordinary use.
+- **Symbolica reports another unlicensed instance or cannot start in restricted mode.** Stop other unlicensed Symbolica processes on the machine. The free restricted mode permits only one instance and one core per device.
+- **A workflow reports that an output directory or SQLite database already exists.** Use a new empty output directory. Existing outputs are rejected intentionally to prevent data from different runs from being mixed.
+- **Fresh PMC collection fails because of permissions or CPU-topology checks.** The portable/reference evaluation does not require access to hardware counters. Use the checked-in measurements, or consult `salt_vs_hw_misses_package/README.md` for the additional requirements of optional fresh collection.
+- **Results differ only in absolute runtime.** Timing is sensitive to CPU performance, system load, and available hardware threads. Compare the generated numeric outputs and qualitative timing relationship rather than requiring identical wall-clock values.
 
 ## Repository layout
 
@@ -314,26 +317,17 @@ Run SALT on an MLIR input:
   --block-size=8
 ```
 
-Omit `--block-size` to keep the cache-line capacity symbolic. Use
-`./target/release/analyzer --help` to list the complete command-line interface.
+Omit `--block-size` to keep the cache-line capacity symbolic. Use `./target/release/analyzer --help` to list the complete command-line interface.
 
 ### Meaning of `--block-size`
 
-Despite its historical name, `--block-size` is measured in target array
-elements, not bytes. It specifies how many elements fit in one modeled cache
-line:
+Despite its historical name, `--block-size` is measured in target array elements, not bytes. It specifies how many elements fit in one modeled cache line:
 
 ```text
 block size in elements = cache-line bytes / element bytes
 ```
 
-For the double-precision contraction and hardware experiments, a 64-byte line
-contains eight 8-byte `f64` elements, so the scripts use `--block-size=8`. For
-the single-precision matrix-multiplication experiment, a 32-byte line contains
-eight 4-byte `f32` elements, so that workflow also uses `--block-size=8`.
-Cache-size axes and turning points in SALT output are consequently expressed
-in numbers of cache lines. When applying SALT to a different element type or
-line size, recompute this value rather than passing a byte count.
+For the double-precision contraction and hardware experiments, a 64-byte line contains eight 8-byte `f64` elements, so the scripts use `--block-size=8`. For the single-precision matrix-multiplication experiment, a 32-byte line contains eight 4-byte `f32` elements, so that workflow also uses `--block-size=8`. Cache-size axes and turning points in SALT output are consequently expressed in numbers of cache lines. When applying SALT to a different element type or line size, recompute this value rather than passing a byte count.
 
 ## Development checks
 

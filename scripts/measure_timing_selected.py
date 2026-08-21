@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import platform
 import sqlite3
 import statistics
@@ -33,6 +34,55 @@ def command_version(command):
         command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False
     )
     return result.stdout.splitlines()[0] if result.stdout else "unknown"
+
+
+def source_revision(repository_root):
+    """Return the source revision without requiring Git metadata.
+
+    A Git archive does not contain .git. Docker records the archived revision
+    in ARTIFACT_REVISION, so use that value when this directory is not the root
+    of a Git worktree. Checking the worktree root also prevents accidentally
+    reporting metadata from an unrelated parent repository.
+    """
+    git_root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=repository_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if git_root.returncode == 0:
+        try:
+            is_repository_root = (
+                Path(git_root.stdout.strip()).resolve() == repository_root.resolve()
+            )
+        except OSError:
+            is_repository_root = False
+        if is_repository_root:
+            revision = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repository_root,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            status = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repository_root,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            if revision.returncode == 0 and status.returncode == 0:
+                return revision.stdout.strip(), bool(status.stdout)
+
+    artifact_revision = os.environ.get("ARTIFACT_REVISION", "").strip()
+    if artifact_revision and artifact_revision != "unknown":
+        return artifact_revision, False
+    return "unknown", False
 
 
 def measure(command, repetitions, cwd, label):
@@ -180,22 +230,7 @@ def main():
                     else command
                 )
 
-    revision = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=REPOSITORY_ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        check=True,
-    ).stdout.strip()
-    dirty = bool(
-        subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=REPOSITORY_ROOT,
-            text=True,
-            stdout=subprocess.PIPE,
-            check=True,
-        ).stdout
-    )
+    revision, dirty = source_revision(REPOSITORY_ROOT)
 
     document = {
         "schema_version": 1,
