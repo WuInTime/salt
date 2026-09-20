@@ -19,6 +19,9 @@ from typing import Any
 import matplotlib
 
 matplotlib.use("Agg")
+# Use embedded TrueType fonts rather than Matplotlib's Type 3 PDF glyphs.
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -348,19 +351,19 @@ def plot_results(rows: list[dict[str, Any]], path: Path) -> tuple[float, float]:
         [row["salt_estimated_miss_count"] for row in rows], dtype=float
     )
     relative = (estimated - measured) / np.where(measured == 0, np.nan, measured)
-    mare = float(np.nanmean(np.abs(relative)))
+    mape = 100.0 * float(np.nanmean(np.abs(relative)))
     pearson_r, _ = stats.pearsonr(measured, estimated)
 
     plt.style.use("seaborn-v0_8")
     sns.set_context("talk")
     plt.rcParams["svg.hashsalt"] = "salt-vs-hw-misses"
-    fig, ax = plt.subplots(figsize=(9, 3))
+    fig, ax = plt.subplots(figsize=(9, 3.6))
     ax.scatter(measured, estimated, s=100, alpha=0.8)
     maximum = float(np.nanmax(np.concatenate([measured, estimated])))
     ax.plot([0, maximum], [0, maximum], "k--", alpha=0.6)
-    ax.set_xlabel("PMC L1D load misses")
-    ax.set_ylabel("Cache misses")
-    annotation = f" N={len(rows)}\nMARE={mare:.4f}\nPearson r={pearson_r:.3f}"
+    ax.set_xlabel("Measured L1D load misses")
+    ax.set_ylabel("SALT-predicted misses")
+    annotation = f" N={len(rows)}\nMAPE={mape:.2f}%\nPearson r={pearson_r:.4f}"
     ax.text(
         0.05,
         0.95,
@@ -376,8 +379,11 @@ def plot_results(rows: list[dict[str, Any]], path: Path) -> tuple[float, float]:
     fig.tight_layout()
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=1200, metadata={"Date": None})
+    pdf_path = path.with_suffix(".pdf")
+    if pdf_path != path:
+        fig.savefig(pdf_path, format="pdf", dpi=1200)
     plt.close(fig)
-    return mare, float(pearson_r)
+    return mape, float(pearson_r)
 
 
 def main() -> int:
@@ -395,11 +401,12 @@ def main() -> int:
     )
     rows = derive_results(args, benchmarks)
     write_results(rows, args.results_output)
-    mare, pearson_r = plot_results(rows, args.plot_output)
+    mape, pearson_r = plot_results(rows, args.plot_output)
     print(
-        f"benchmarks={len(rows)} MARE={mare:.4f} Pearson_r={pearson_r:.4f}\n"
+        f"benchmarks={len(rows)} MAPE={mape:.2f}% Pearson_r={pearson_r:.4f}\n"
         f"wrote {args.results_output}\n"
-        f"wrote {args.plot_output}"
+        f"wrote {args.plot_output}\n"
+        f"wrote {args.plot_output.with_suffix('.pdf')}"
     )
     return 0
 

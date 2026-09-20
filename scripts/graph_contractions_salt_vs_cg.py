@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
 
+# MPLCONFIGDIR=/tmp/salt-matplotlib \
+# python3 scripts/graph_contractions_salt_vs_cg.py --fully-db results/mlir-contractions/data-fully-associative.db --8way-db results/mlir-contractions/data-8way-associative.db --12way-db results/mlir-contractions/data-12way-associative.db --constant-dir results/mlir-contractions/work/constant --output-dir results/mlir-contractions
+
 import argparse
 import sqlite3
 import json
+import matplotlib
+
+# Embed TrueType fonts in PDF output.  Matplotlib's default Type 3 glyphs are
+# rejected by several camera-ready PDF validators.
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
@@ -201,6 +210,19 @@ def trim_trailing_near_zero_data(turning_points, miss_ratios, zero_tol=1e-12):
         return [], []
     return turning_points[:last_positive_idx + 1], miss_ratios[:last_positive_idx + 1]
 
+def terminal_plateau_start(turning_points, values, rel_tol=1e-9, abs_tol=1e-12):
+    """Return the first turning point in the final run of equal values."""
+    if not turning_points or not values:
+        return None
+
+    plateau_idx = len(values) - 1
+    final_value = values[plateau_idx]
+    while plateau_idx > 0 and np.isclose(
+        values[plateau_idx - 1], final_value, rtol=rel_tol, atol=abs_tol
+    ):
+        plateau_idx -= 1
+    return turning_points[plateau_idx]
+
 def positive_values(values):
     """Return positive finite values for log-axis scaling."""
     return [value for value in values if np.isfinite(value) and value > 0]
@@ -236,12 +258,15 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
         print(f"Total programs to plot: {n_programs} - Linear scale")
     
     # Create a 4x4 grid with shorter panels to reduce empty vertical space.
-    fig, axes = plt.subplots(4, 4, figsize=(24, 10))
+    fig, axes = plt.subplots(4, 4, figsize=(24, 9.1))
     
     # Keep enough room for axis labels and the shared legend without an oversized bottom margin.
     plt.subplots_adjust(
-        left=0.01, bottom=0.025, right=0.99, top=0.99, 
-                       wspace=0.25, hspace=0.6)
+        #     top=0.99,
+        left=0,
+        right=1, # Without it, Matplotlib uses the default right=0.9
+        bottom=0.13, # Without it, Matplotlib uses the default bottom=0.1
+        wspace=0.2, hspace=1.0)
     
     # Flatten axes array for easier indexing
     axes_flat = axes.flatten()
@@ -266,7 +291,7 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
         measured_x_values = []
         salt_trim_plateau_start = None
         
-        # Plot fully associative data with turning point style (using miss counts) - NO FILTER, NO EXTEND
+        # Plot fully associative data with diamond markers (using miss counts) - NO FILTER, NO EXTEND
         program_data_fully = df_fully_assoc[df_fully_assoc['program'] == program]
         if not program_data_fully.empty:
             program_data_fully = program_data_fully.copy()
@@ -277,13 +302,15 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
             miss_counts = program_data_fully['d1_miss_count'].tolist()
             turning_points, miss_counts = clip_leading_nonpositive_data(turning_points, miss_counts)
             step_x, step_y = create_step_function_data(turning_points, miss_counts, extend=False)
-            x_limit_values.extend(positive_values(step_x))
+            fully_x_values = positive_values(step_x)
+            x_limit_values.extend(fully_x_values)
+            measured_x_values.extend(fully_x_values)
             positive_y_values.extend(positive_values(step_y))
             
             if step_x and step_y:
                 line1, = ax.plot(step_x, step_y, 
-                'x', label='Fully Assoc', 
-                linewidth=2, color='gray')  # Changed to gray
+                'D', label='Fully Assoc',
+                linewidth=1, markersize=2.5, color='gray')
                 if not legend_created:
                     legend_handles.append(line1)
                     legend_labels.append('Fully Assoc')
@@ -315,7 +342,7 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
             
             line3, = ax.plot(program_data_12way['cache_size'], program_data_12way['d1_miss_count'], 
                             '+', label='12-way', 
-                            markersize=10, markeredgewidth=2)  # Removed color='green'
+                            markersize=12, markeredgewidth=2)  # Removed color='green'
             cache_x_values = positive_values(program_data_12way['cache_size'])
             x_limit_values.extend(cache_x_values)
             measured_x_values.extend(cache_x_values)
@@ -339,7 +366,7 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
                 salt_turning_points = positive_values(turning_points)
                 x_limit_values.extend(salt_turning_points)
                 if salt_turning_points:
-                    salt_trim_plateau_start = salt_turning_points[-2] if len(salt_turning_points) >= 2 else salt_turning_points[-1]
+                    salt_trim_plateau_start = terminal_plateau_start(turning_points, miss_ratios)
 
                 # Convert miss ratios to miss counts
                 miss_counts = [ratio * total_access for ratio in miss_ratios]
@@ -377,8 +404,8 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
         # Customize the subplot with appropriate font sizes (doubled)
         ax.set_xlabel('Cache Size', fontsize=18, loc='right')
         y_label = 'Miss Count'
-        ax.set_ylabel(y_label, fontsize=17)
-        ax.set_title(display_name, fontsize=18, pad=8, fontweight='bold')
+        ax.set_ylabel(y_label, fontsize=18)
+        ax.set_title(display_name, fontsize=20, pad=8, fontweight='bold')
         
         ax.grid(True, alpha=0.3, linestyle=':', linewidth=0.5)
         
@@ -400,14 +427,19 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
     # Share x-ranges within each constant/tiled pair while excluding artificial SALT extensions.
     for pair in paired_subplot_indices(n_programs):
         pair_x_values = []
-        pair_measured_x_values = []
-        pair_trim_plateau_starts = []
+        log_right_candidates = []
         for idx in pair:
             pair_x_values.extend(x_limit_values_by_idx.get(idx, []))
-            pair_measured_x_values.extend(measured_x_values_by_idx.get(idx, []))
+            measured_x_values = measured_x_values_by_idx.get(idx, [])
             salt_trim_plateau_start = salt_trim_plateau_start_by_idx.get(idx)
             if salt_trim_plateau_start is not None:
-                pair_trim_plateau_starts.append(salt_trim_plateau_start)
+                last_measured_x = max(measured_x_values) if measured_x_values else 0
+                if last_measured_x >= salt_trim_plateau_start:
+                    log_right_candidates.append(last_measured_x * 2.0)
+                else:
+                    log_right_candidates.append(salt_trim_plateau_start * 1.25)
+            elif measured_x_values:
+                log_right_candidates.append(max(measured_x_values) * 2.0)
         if pair_x_values:
             min_x = min(pair_x_values)
             max_x = max(pair_x_values)
@@ -415,11 +447,8 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
                 left, right = min_x / 1.5, max_x * 1.5
             else:
                 left, right = min_x / 1.25, max_x * 1.25
-            if pair_measured_x_values and pair_trim_plateau_starts:
-                max_measured_x = max(pair_measured_x_values)
-                trim_plateau_start = max(pair_trim_plateau_starts)
-                if max_measured_x >= trim_plateau_start:
-                    right = min(right, max_measured_x * 8)
+            if log_scale and log_right_candidates:
+                right = max(log_right_candidates)
             for idx in pair:
                 axes_flat[idx].set_xlim(left=left, right=right)
     
@@ -430,8 +459,9 @@ def plot_data(df_fully_assoc, df_8way, df_12way, constant_dir='./constant/', log
     # Create a single legend positioned at the bottom
     if legend_handles:
         fig.legend(legend_handles, legend_labels, 
-                  loc='lower center', bbox_to_anchor=(0.5, -0.06),
-                  borderaxespad=0.0,
+                  loc='lower right',
+                #   bbox_to_anchor=(0.96, -0.12),
+                  borderaxespad=0.1,
                   ncol=len(legend_labels), fontsize=18,
                   frameon=True, fancybox=True, shadow=True)
     
@@ -565,19 +595,23 @@ def main():
     print("Creating plot...")
     fig_log = plot_data(df_fully_assoc, df_8way, df_12way, constant_dir, log_scale=True)
     
-    # Save log scale plot as SVG
+    # Save log scale plot as SVG and PDF
     filename_log = args.output_dir / 'miss_count_comparison_all_programs_log.svg'
     fig_log.savefig(filename_log, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
-    print(f"Plot saved as '{filename_log}' (vector format)")
+    filename_log_pdf = filename_log.with_suffix('.pdf')
+    fig_log.savefig(filename_log_pdf, format='pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
+    print(f"Plots saved as '{filename_log}' and '{filename_log_pdf}' (vector formats)")
     
     # LINEAR SCALE PLOT
     print("Creating linear scale plot...")
     fig_linear = plot_data(df_fully_assoc, df_8way, df_12way, constant_dir, log_scale=False)
     
-    # Save linear scale plot as SVG
+    # Save linear scale plot as SVG and PDF
     filename_linear = args.output_dir / 'miss_count_comparison_all_programs_linear.svg'
     fig_linear.savefig(filename_linear, format='svg', bbox_inches='tight', facecolor='white', edgecolor='none')
-    print(f"Linear scale plot saved as '{filename_linear}' (vector format)")
+    filename_linear_pdf = filename_linear.with_suffix('.pdf')
+    fig_linear.savefig(filename_linear_pdf, format='pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
+    print(f"Linear scale plots saved as '{filename_linear}' and '{filename_linear_pdf}' (vector formats)")
     
     if args.show:
         plt.show()

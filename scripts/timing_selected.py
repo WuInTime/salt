@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# MPLCONFIGDIR=/tmp/salt-matplotlib \
+# python3 scripts/timing_selected.py --data results/mlir-contractions/timing-selected.json --out results/mlir-contractions/timing-selected.svg
+
 import argparse
 import json
 import math
 from pathlib import Path
 
+import matplotlib
+
+# Use embedded TrueType fonts rather than Matplotlib's Type 3 PDF glyphs.
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
 import matplotlib.pyplot as plt
 from matplotlib.ticker import NullFormatter
 
@@ -90,26 +98,39 @@ def plot_selected(data_path: Path, out_path: str, dpi=600):
         y_per_series.append(y)
         x_per_series.append(x)
 
+    # Keep the two longest timing labels inside the plot by placing them above
+    # their bar ends. All other labels remain just to the right of the bar.
+    longest_labels = set(
+        sorted(
+            (
+                (x_per_series[series_idx][kernel_idx], series_idx, kernel_idx)
+                for series_idx in range(n_series)
+                for kernel_idx in range(len(plot_order))
+            ),
+            reverse=True,
+        )[:2]
+    )
+
     for kernel_idx in range(len(plot_order)):
         for series_idx in range(n_series):
             label = SERIES[series_idx]
             seconds = x_per_series[series_idx][kernel_idx]
             y = y_per_series[series_idx][kernel_idx]
+            place_above = (seconds, series_idx, kernel_idx) in longest_labels
             ax.annotate(
                 format_bar_label(label, seconds),
                 xy=(seconds, y),
-                xytext=(1, -4),
+                xytext=(40, -5) if place_above else (1, -5),
                 textcoords="offset points",
-                va="center",
-                ha="left",
-                fontsize=11.0,
+                va="top" if place_above else "center",
+                ha="right" if place_above else "left",
+                fontsize=14.0,
                 color="black",
                 clip_on=False,
             )
 
     ax.set_yticks(base_y)
     ax.set_yticklabels(plot_order, fontweight="bold", fontsize=14)
-    # ax.set_title("Selected Timing Comparison", fontweight="bold", fontsize=13)
     ax.set_xlabel("Time (seconds, log scale)", fontweight="bold", fontsize=14)
     ax.set_xscale("log")
     left_lim = max(min_sec / 1.8, 1e-6)
@@ -142,7 +163,12 @@ def plot_selected(data_path: Path, out_path: str, dpi=600):
 
     fig.subplots_adjust(top=0.82)
     fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
-    print(f"Saved plot to: {out_path}")
+    pdf_path = out_path.with_suffix(".pdf")
+    if pdf_path != out_path:
+        fig.savefig(pdf_path, format="pdf", bbox_inches="tight")
+        print(f"Saved plots to: {out_path} and {pdf_path}")
+    else:
+        print(f"Saved plot to: {out_path}")
 
 
 def main():

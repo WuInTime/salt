@@ -1,8 +1,8 @@
 # SALT vs. hardware L1D misses package
 
 This package generates SALT miss-count JSON files from the repository's MLIR,
-compares them with measured PMC L1D load misses, and creates
-`results/salt-vs-hardware/salt_vs_hw_misses.svg` at the repository root.
+compares them with measured PMC L1D load misses, and creates SVG and PDF plots
+under `results/salt-vs-hardware/` at the repository root.
 It includes the exact C sources and PMC collector for the 16 orig/tiled
 benchmarks plus original stencil, for 17 benchmarks total.
 
@@ -28,8 +28,8 @@ three analysis steps:
 2. Matches those estimates with the PMC measurements by benchmark name and
    writes `results/salt-vs-hardware/salt_vs_hw_misses_results.csv` at the
    repository root.
-3. Calculates MARE and Pearson correlation and writes
-   `results/salt-vs-hardware/salt_vs_hw_misses.svg`.
+3. Calculates MAPE (the percentage form of MARE) and Pearson correlation and
+   writes `results/salt-vs-hardware/salt_vs_hw_misses.{svg,pdf}`.
 
 By default it compares against the pre-measured Intel i7-7700 data in
 `salt_vs_hw_misses_package/data/pmu_i7-7700_result.csv`.

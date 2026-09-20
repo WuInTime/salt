@@ -92,7 +92,7 @@ RUN git config --global \
 RUN cargo test --release --locked --workspace --no-run \
     && cargo build --release --locked --workspace
 
-ARG ARTIFACT_REVISION=pact26-ae-v1.0.2
+ARG ARTIFACT_REVISION=v1.1
 ENV ARTIFACT_REVISION="${ARTIFACT_REVISION}"
 
 COPY benchmarks/ benchmarks/

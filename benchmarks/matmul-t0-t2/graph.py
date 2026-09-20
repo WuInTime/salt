@@ -3,6 +3,11 @@
 import json
 import numpy as np
 import argparse
+import matplotlib
+
+# Keep any PDF export compatible with publication PDF validators.
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
 import matplotlib.pyplot as plt
 
 # Set the plot style to ggplot

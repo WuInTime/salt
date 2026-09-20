@@ -12,7 +12,7 @@ repository-root `README.md`.
 - LLVM/MLIR 21, including `mlir-opt`
 - `clang++` with static-linking support
 - Valgrind with Cachegrind
-- Python 3
+- Python 3.12 or newer
 - Python packages: `matplotlib`, `numpy`, and `pandas`
 
 Install the pinned Python dependencies from the repository root:
@@ -63,7 +63,9 @@ Results are written to `results/mlir-contractions/`:
 - `data-8way-associative.db`
 - `data-12way-associative.db`
 - `miss_count_comparison_all_programs_log.svg`
+- `miss_count_comparison_all_programs_log.pdf`
 - `miss_count_comparison_all_programs_linear.svg`
+- `miss_count_comparison_all_programs_linear.pdf`
 - `work/constant/` (staged MLIR inputs and generated SALT JSON)
 
 The script copies the original and checked-in tiled MLIR into
@@ -121,6 +123,7 @@ experiment, and writes:
 - `results/timing-simulation-wall.tsv`
 - `results/timing-selected.json`
 - `results/timing-selected.svg`
+- `results/timing-selected.pdf`
 
 Thus the normal artifact workflow is simply:
 

@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+# MPLCONFIGDIR=/tmp/salt-matplotlib \
+# python3 scripts/graph_mm_salt_vs_cg.py --data-dir results/matmul-t0-t2 --svg-output results/matmul-t0-t2/matmul_t0-t2_salt_cachegrind.svg
+
 import json
 import numpy as np
 import os
 import argparse
+import matplotlib
+
+# Avoid Type 3 fonts in the PDF submitted with the paper.
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
 import matplotlib.pyplot as plt
 from pathlib import Path
 
@@ -110,6 +119,7 @@ def autoscale_visible_log_y(
         ax.set_ylim(10 ** (lower - padding), 10 ** (upper + padding))
 
 def run(svg_output, data_dir):
+    svg_output = Path(svg_output)
     # Define the file groups with ggplot-friendly colors
     groups = [
         {
@@ -136,7 +146,7 @@ def run(svg_output, data_dir):
     ]
     
     # Create the plot
-    plt.figure(figsize=(20, 7))
+    plt.figure(figsize=(20, 4.2))
     
     # Additional tmp files corresponding to the groups (matmul, matmul-t1, matmul-t2)
     tmp_files = [data_dir / 'mr_t0.json', data_dir / 'mr_t1.json', data_dir / 'mr_t2.json']
@@ -190,17 +200,17 @@ def run(svg_output, data_dir):
             # For an unfilled marker like 'x', pass `color=` to avoid edgecolor warnings.
             if marker in ('o', 's'):
                 plt.scatter(matmul_blocks[valid_mask], matmul_miss_ratio[valid_mask],
-                            label=f'Cachegrind - {group["label"]}',
+                            label=f'{group["label"]} - Cachegrind',
                             facecolors='none', edgecolors=group['color'], alpha=0.9,
                             s=300, marker=marker, linewidths=2.0)
             elif marker == 'x':
                 plt.scatter(matmul_blocks[valid_mask], matmul_miss_ratio[valid_mask],
-                            label=f'Cachegrind - {group["label"]}',
+                            label=f'{group["label"]} - Cachegrind',
                             color=group['color'], alpha=0.9,
                             s=300, marker=marker, linewidths=2.0)
             else:
                 plt.scatter(matmul_blocks[valid_mask], matmul_miss_ratio[valid_mask],
-                            label=f'Cachegrind - {group["label"]}',
+                            label=f'{group["label"]} - Cachegrind',
                             facecolors=group['color'], edgecolors=group['color'], alpha=0.8,
                             s=300, marker=marker, linewidths=2.0)
 
@@ -215,14 +225,14 @@ def run(svg_output, data_dir):
             extended_turning_points = np.append(salt_turning_points, plot_max_x)
             extended_miss_ratio = np.append(salt_miss_ratio, salt_miss_ratio[-1])
             
-            plt.step(extended_turning_points, extended_miss_ratio, 
-                    where='post', label=f'SALT - {group["label"]}', 
+            plt.step(extended_turning_points, extended_miss_ratio,
+                    where='post', label=f'{group["label"]} - SALT',
                     color=group['color'], linestyle='--', linewidth=2.5, alpha=0.9)
 
     # Formatting with ggplot style
-    plt.xlabel('Cache Size (#Blocks)', fontsize=30, fontweight='bold')
-    plt.ylabel('Miss Ratio', fontsize=30, fontweight='bold')
-    plt.legend(fontsize=18, frameon=True, fancybox=True, shadow=True, loc='lower left', markerscale=1.3)
+    plt.xlabel('Cache Size (#Blocks)', fontsize=20, fontweight='bold')
+    plt.ylabel('Miss Ratio', fontsize=20, fontweight='bold')
+    plt.legend(fontsize=18, frameon=True, fancybox=True, shadow=True, loc='lower left')
     plt.xscale('log')
     plt.yscale('log')
 
@@ -232,13 +242,14 @@ def run(svg_output, data_dir):
     # autoscale_visible_log_y(plt.gca(), x_min, x_max)
 
     # Increase tick label sizes for better readability
-    plt.tick_params(axis='both', which='major', labelsize=20)
-    plt.tick_params(axis='both', which='minor', labelsize=20)
+    # plt.tick_params(axis='both', which='major', labelsize=20)
+    # plt.tick_params(axis='both', which='minor', labelsize=20)
 
     # Save and show plot
     plt.tight_layout()
     plt.savefig(svg_output, format='svg')
-    plt.savefig(svg_output.replace('.svg', '.png'), format='png', dpi=300)
+    plt.savefig(svg_output.with_suffix('.pdf'), format='pdf')
+    plt.savefig(svg_output.with_suffix('.png'), format='png', dpi=300)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Benchmark Graph Plotter - Multiple Groups Comparison')

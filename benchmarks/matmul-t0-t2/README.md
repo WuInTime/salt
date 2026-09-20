@@ -13,7 +13,7 @@ scripts/run-matmul-t0-t2-evaluation.sh
 
 Results are written to `results/matmul-t0-t2/`.
 The driver generates the six JSON inputs expected by
-`scripts/graph_mm_salt_vs_cg.py`, followed by SVG and PNG figures.
+`scripts/graph_mm_salt_vs_cg.py`, followed by SVG, PDF, and PNG figures.
 
 For a quick pipeline check:
 
