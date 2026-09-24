@@ -41,5 +41,5 @@ salt-pact26-v*.tar.gz
 salt_vs_hw_misses_package/benchmarks/bin
 benchmarks/matmul-t0-t2/og.py
 ZENODO_DESCRIPTION.md
-ZENODO_DESCRIPTION.html
+ZENODO_DESCRIPTION*.html
 /gitlab-salt-release/

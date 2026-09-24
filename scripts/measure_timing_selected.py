@@ -149,7 +149,7 @@ def main():
         check=False,
     ).stdout
     if "barvinok" not in help_text:
-        parser.error("analyzer was built without the default Barvinok feature")
+        parser.error("analyzer was built without the `barvinok` feature")
 
     measurements = {
         "Simulation Fully (Tiled)": {},

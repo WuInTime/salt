@@ -90,7 +90,7 @@ RUN git config --global \
 # Compile both the evaluator-facing binaries and test harnesses during image
 # construction so dependency and standalone-binary failures happen early.
 RUN cargo test --release --locked --workspace --no-run \
-    && cargo build --release --locked --workspace
+    && cargo build --release --locked --workspace --features analyzer/barvinok
 
 ARG ARTIFACT_REVISION=v1.1
 ENV ARTIFACT_REVISION="${ARTIFACT_REVISION}"

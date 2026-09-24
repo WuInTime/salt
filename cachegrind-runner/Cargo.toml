@@ -5,16 +5,16 @@ edition = "2024"
 
 [dependencies]
 raffine = { path = "../raffine" }
-palc = { git = "https://github.com/oxalica/palc.git", rev = "ac90678283c5e4fde4d99bb914eb1ded35a52133" }
-anyhow = { version = "1.0.98", features = ["backtrace"] }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-melior = { version = "0.26.9"}
-tempfile = "3.20.0"
-unescaper = "0.1.6"
-rusqlite = { version = "0.37.0", features = ["bundled-full"] }
-r2d2_sqlite = "0.31.0"
+clap.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+melior.workspace = true
+tempfile = "3.27.0"
+unescaper = "0.2.0"
+rusqlite = { version = "0.40.2", features = ["bundled", "fallible_uint"] }
+r2d2_sqlite = "0.35.0"
 r2d2 = "0.8.10"
-indicatif = { version = "0.18.0", features = ["rayon"] }
-rayon = "1.10.0"
-sysinfo = "0.38.4"
+indicatif.workspace = true
+rayon.workspace = true
+sysinfo = { version = "0.39.6", default-features = false, features = ["component"] }

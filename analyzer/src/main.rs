@@ -5,15 +5,19 @@ use barvinok::ContextRef as BContext;
 use barvinok::constraint::Constraint;
 #[cfg(feature = "barvinok")]
 use barvinok::local_space::LocalSpace;
+use clap::{Parser, Subcommand};
 use melior::Context as MContext;
 use melior::ir::{BlockLike, Module, OperationRef, RegionLike, operation::OperationLike};
-use palc::{Parser, Subcommand};
+#[cfg(feature = "plotters")]
 use plotters::prelude::IntoDrawingArea;
 use raffine::Context as RContext;
 use raffine::{DominanceInfo, tree::Tree};
+#[cfg(any(feature = "barvinok", feature = "plotters"))]
 use std::num::NonZero;
 use std::{collections::HashMap, io::Read, path::PathBuf};
-use tracing::{debug, error, info};
+#[cfg(feature = "plotters")]
+use tracing::info;
+use tracing::{debug, error};
 #[cfg(feature = "barvinok")]
 mod isl;
 mod salt;
@@ -104,9 +108,6 @@ enum Method {
     },
 }
 
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 #[derive(Debug, Parser)]
 struct Options {
     /// The input file to process
@@ -129,17 +130,20 @@ struct Options {
     #[arg(short = 'l', long)]
     target_affine_loop: Option<String>,
 
-    /// Miss ratio curve output path
+    /// Miss ratio curve output path (requires the `plotters` feature)
+    #[cfg(feature = "plotters")]
     #[arg(short = 'm', long)]
     miss_ratio_curve: Option<PathBuf>,
 
-    /// Miss ratio curve width
+    /// Miss ratio curve width (requires the `plotters` feature)
     /// if not specified, the default value is 800
+    #[cfg(feature = "plotters")]
     #[arg(short = 'W', long, default_value = "800")]
     miss_ratio_curve_width: u32,
 
-    /// Miss ratio curve height
+    /// Miss ratio curve height (requires the `plotters` feature)
     /// if not specified, the default value is 600
+    #[cfg(feature = "plotters")]
     #[arg(short = 'H', long, default_value = "600")]
     miss_ratio_curve_height: u32,
 
@@ -148,6 +152,7 @@ struct Options {
     #[arg(long)]
     json: bool,
 
+    #[cfg(feature = "plotters")]
     #[arg(short = 'A', long, default_value = "1")]
     associativity: NonZero<usize>,
 
@@ -362,9 +367,13 @@ fn main_entry() -> anyhow::Result<()> {
                 writeln!(writer, "{table}")?;
                 writeln!(writer, "Total: {space_count:?}")?;
                 match isl::get_distro(&raw_distro, space_count, *infinite_repeat) {
-                    Ok(dist) => {
-                        let mut curve = denning::MissRatioCurve::new(&dist);
+                    Ok(_dist) => {
+                        #[cfg(not(feature = "plotters"))]
+                        let _ = _dist;
+                        #[cfg(feature = "plotters")]
+                        let mut curve = denning::MissRatioCurve::new(&_dist);
                         // apply associativity only when it's greater than 1
+                        #[cfg(feature = "plotters")]
                         if options.associativity.get() > 1 {
                             curve = curve.compute_assoc(
                                 options.associativity.get(),
@@ -372,7 +381,7 @@ fn main_entry() -> anyhow::Result<()> {
                                 denning::SkewDecay::Constant,
                             );
                         }
-
+                        #[cfg(feature = "plotters")]
                         if let Some(path) = &options.miss_ratio_curve {
                             let svgbackend = plotters::backend::SVGBackend::new(
                                 path,
@@ -475,10 +484,13 @@ fn main_entry() -> anyhow::Result<()> {
                 writeln!(writer, "{instance_table}")?;
                 let total_count = salt::get_total_count(access_cnt, tc.values());
                 writeln!(writer, "Total: {total_count}")?;
+                #[cfg(feature = "plotters")]
                 let distribution =
                     salt::get_adjusted_ri_distribution(&ri_dist_vec, &curve_adjustments);
+                #[cfg(feature = "plotters")]
                 let mut curve = denning::MissRatioCurve::new(&distribution);
                 // Apply associativity only when it is greater than one.
+                #[cfg(feature = "plotters")]
                 if options.associativity.get() > 1 {
                     curve = curve.compute_assoc(
                         options.associativity.get(),
@@ -486,7 +498,7 @@ fn main_entry() -> anyhow::Result<()> {
                         denning::SkewDecay::Constant,
                     );
                 }
-
+                #[cfg(feature = "plotters")]
                 if let Some(path) = &options.miss_ratio_curve {
                     let svgbackend = plotters::backend::SVGBackend::new(
                         path,

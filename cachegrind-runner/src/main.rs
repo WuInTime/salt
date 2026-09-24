@@ -4,7 +4,7 @@ use melior::ir::attribute::{StringAttribute, TypeAttribute};
 use melior::ir::operation::OperationLike;
 use melior::ir::r#type::MemRefType;
 use melior::ir::{BlockLike, Module, OperationRef, ShapedTypeLike};
-use palc::Parser;
+use clap::Parser;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use raffine::affine::{AffineExpr, AffineMap};
@@ -656,7 +656,8 @@ fn main() {
             let block_size = args.d1_block_size;
             let cache_size = args.d1_cache_size;
             (block_size..=cache_size)
-                .step_by(block_size)
+                .step_by(block_size*256)
+                // TODO: This is a temporary solution to avoid too many runs. We can remove * $$ before artifact submission. Or simply do not commit this file change.
                 .collect::<Vec<_>>()
         }
     } else {

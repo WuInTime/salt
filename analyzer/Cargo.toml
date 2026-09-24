@@ -4,28 +4,28 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["barvinok"]
+default = []
 barvinok = ["dep:barvinok"]
+plotters = ["denning/plotters", "dep:plotters"]
 
 [dependencies]
 raffine = { path = "../raffine" }
-denning = { path = "../denning", features = ["plotters"] }
+denning = { path = "../denning" }
 barvinok = { git = "https://github.com/Roc-Locality/barvinok-rs", rev = "cc72f5071bb7a1a9ec11e228fcb1686c2f8d3f6c", optional = true }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing = { version = "0.1", default-features = false, features = [
-    "std",
-    "log",
+tracing-subscriber.workspace = true
+tracing = { workspace = true, features = [
     "max_level_trace",
     "release_max_level_info",
 ] }
-palc = { git = "https://github.com/oxalica/palc", rev = "ac90678283c5e4fde4d99bb914eb1ded35a52133" }
-melior = { version = "0.26.9" }
-anyhow = { version = "1.0.98", features = ["backtrace"] }
+clap.workspace = true
+melior.workspace = true
+anyhow.workspace = true
 symbolica = { version = "1.5.1", default-features = false }
-comfy-table = "7.1.4"
+comfy-table = { version = "7.2.2", default-features = false }
 ahash = "0.8.12"
-gmp-mpfr-sys = "1.6.5"
-serde = { version = "1.0.219", features = ["derive"] }
-mimalloc = { version = "0.1.48", features = ["override", "v3"] }
-serde_json = "1.0.140"
-plotters = "0.3.7"
+serde.workspace = true
+serde_json = "1.0.151"
+plotters = { version = "0.3.7", default-features = false, features = [
+    "svg_backend",
+    "line_series",
+], optional = true }

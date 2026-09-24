@@ -28,6 +28,7 @@ fi
 
 echo "Building Barvinok/SALT analyzer and Cachegrind runner..."
 cargo build --locked --release -p analyzer --bin analyzer \
+    --features analyzer/barvinok \
     --manifest-path "$repository_root/Cargo.toml"
 cargo build --locked --release -p cachegrind-runner --bin cachegrind-runner \
     --manifest-path "$repository_root/Cargo.toml"

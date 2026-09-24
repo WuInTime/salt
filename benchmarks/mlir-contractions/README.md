@@ -112,7 +112,7 @@ All paths accepted by `graph_contractions_salt_vs_cg.py` can be overridden; run
 Build the Barvinok-enabled analyzer and Cachegrind runner first:
 
 ```bash
-cargo build --locked --release -p analyzer --bin analyzer
+cargo build --locked --release -p analyzer --bin analyzer --features analyzer/barvinok
 cargo build --locked --release -p cachegrind-runner --bin cachegrind-runner
 ```
 
