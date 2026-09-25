@@ -98,6 +98,17 @@ docker run --rm --init \
 
 The container records its tool versions in `environment-smoke.txt` or `environment-full.txt` alongside the results. Run `docker run --rm salt-artifact help` for all container commands.
 
+## Chameleon Cloud and Trovi workflow
+
+The evaluator-facing [`chameleon-salt.ipynb`](chameleon-salt.ipynb) notebook
+automates the complete Chameleon lifecycle: it reserves a `compute_skylake`
+bare-metal node and floating IP at `CHI@UC`, launches Ubuntu, configures the
+host with [`chameleon/setup-node.sh`](chameleon/setup-node.sh), builds and runs
+the Docker artifact, downloads results, and tears down the server and lease.
+See [`chameleon/README.md`](chameleon/README.md) for the expected Trovi file
+layout, recovery procedure, and distinction between the portable reference-PMC
+workflow and optional fresh measurements on the allocated processor.
+
 ## Typical runtimes
 
 The following approximate wall-clock times are based on warm runs on an Intel Core i7-7700 with four cores, eight hardware threads, and 32 GiB of memory:
