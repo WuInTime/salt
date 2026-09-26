@@ -1,10 +1,14 @@
 # SALT vs. hardware L1D misses package
 
 This package generates SALT miss-count JSON files from the repository's MLIR,
-compares them with measured PMC L1D load misses, and creates SVG and PDF plots
-under `results/salt-vs-hardware/` at the repository root.
-It includes the exact C sources and PMC collector for the 16 orig/tiled
-benchmarks plus original stencil, for 17 benchmarks total.
+compares them with packaged measurements of Linux's generic L1D/read/miss event,
+and creates SVG and PDF plots under `results/salt-vs-hardware/` at the repository
+root. On the Intel systems validated for this artifact, that generic selector
+maps to `L1D.REPLACEMENT`; the historical load-miss labels are retained for
+compatibility with the paper data and plotting workflow.
+
+The package includes the exact C sources and PMC collector for the 16
+orig/tiled benchmarks plus original stencil, for 17 benchmarks total.
 
 ## Reproduce Figure 4 with the reference data
 
@@ -157,22 +161,33 @@ This step is optional for artifact evaluation. The normal Figure 4 workflow
 uses the checked-in `data/pmu_i7-7700_result.csv`, measured on an Intel Core
 i7-7700 with simultaneous multithreading (hyperthreading) disabled.
 
-For a meaningful fresh measurement, pin the process to one logical CPU and
-ensure that every other logical CPU sharing that CPU's physical core is
-offline. Pinning with `taskset` alone is not sufficient: a running sibling
-hyperthread can contend for the core and perturb the measurement. On Linux,
-inspect the sibling set and online state before collecting (replace `1` with
-the selected logical CPU):
+The CSV's historical load-miss fields contain Linux's generic
+`L1-dcache-load-misses` event. On the validated i7-7700, i7-6700, and Xeon Gold
+6126 systems, Linux maps this selector to `L1D.REPLACEMENT`, not to the raw
+retired-load event `MEM_LOAD_RETIRED.L1_MISS`. Do not mix those two event types
+in one comparison.
+
+For a meaningful fresh measurement, pass `--cpu` to pin the benchmark to one
+logical CPU. The collector discovers every other logical CPU sharing that
+physical core, temporarily offlines any online siblings, and restores only the
+CPUs it changed when collection finishes or raises an ordinary error. Pinning
+with `taskset` alone is not sufficient: a running sibling can perturb the count.
+
+Changing CPU online state normally requires administrator privileges. The
+collector writes sysfs directly when allowed; otherwise it requests `sudo` only
+for `tee` on the sibling CPU's `online` file. If authorization fails, no
+measurement is taken. Follow the evaluator site's host-management policy. After
+an unrecoverable interruption such as `SIGKILL` or power loss, inspect the
+sibling set and online state and restore it if necessary (replace `1` with the
+selected logical CPU):
 
 ```bash
 cat /sys/devices/system/cpu/cpu1/topology/thread_siblings_list
 lscpu -e=CPU,CORE,ONLINE
 ```
 
-Disabling a sibling CPU normally requires administrator privileges and is a
-host configuration change; follow the evaluator site's policy. Record the CPU
-model, selected logical CPU, sibling state, compiler, and repeat count with any
-new result.
+Record the CPU model, selected logical CPU, sibling state, compiler, kernel
+event mapping, and repeat count with any new result.
 
 From the repository root, collect the median of three runs into `results/`:
 

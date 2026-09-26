@@ -27,6 +27,7 @@ apt-get install -y --no-install-recommends \
     cmake \
     curl \
     docker.io \
+    docker-buildx \
     flex \
     g++ \
     gcc \
@@ -88,6 +89,7 @@ sysctl --system >/dev/null
 
 echo "Node setup complete."
 echo "Docker: $(docker --version)"
+docker buildx version
 echo "Perf: $(perf --version)"
 echo "perf_event_paranoid: $(sysctl -n kernel.perf_event_paranoid)"
 echo "User '$target_user' is in groups: $(id -nG "$target_user")"

@@ -101,9 +101,11 @@ The container records its tool versions in `environment-smoke.txt` or `environme
 ## Chameleon Cloud and Trovi workflow
 
 The evaluator-facing [`chameleon-salt.ipynb`](chameleon-salt.ipynb) notebook
-automates the complete Chameleon lifecycle: it reserves a `compute_skylake`
-bare-metal node and floating IP at `CHI@UC`, launches Ubuntu, configures the
-host with [`chameleon/setup-node.sh`](chameleon/setup-node.sh), builds and runs
+automates the complete Chameleon lifecycle. At the explicitly configured site
+(`CHI@TACC` by default, with `CHI@UC` supported), it reserves the earliest
+qualifying `compute_skylake` bare-metal node and a floating IP, launches Ubuntu,
+configures the host with
+[`chameleon/setup-node.sh`](chameleon/setup-node.sh), builds and runs
 the Docker artifact, downloads results, and tears down the server and lease.
 See [`chameleon/README.md`](chameleon/README.md) for the expected Trovi file
 layout, recovery procedure, and distinction between the portable reference-PMC
@@ -205,13 +207,20 @@ A reproduction is considered successful when:
 
 ## Figure 4: reference data or local PMCs
 
-The normal artifact command uses the checked-in measurements from an Intel Core i7-7700 with hyperthreading disabled. It does not access the current machine's hardware counters:
+The normal artifact command uses the checked-in measurements from an Intel Core
+i7-7700 with hyperthreading disabled. The historical load-miss columns contain
+Linux's generic L1D/read/miss event, which maps to `L1D.REPLACEMENT` on the
+validated Intel systems, not the raw `MEM_LOAD_RETIRED.L1_MISS` event. The
+portable workflow does not access the current machine's hardware counters:
 
 ```bash
 ./scripts/run-salt-vs-hardware-evaluation.sh
 ```
 
-To perform the optional experiment on the current machine, first choose a logical CPU whose sibling hyperthread is offline, then collect three repeats:
+To perform the optional experiment on the current machine, choose a logical CPU.
+The collector temporarily offlines that CPU's online siblings, restores them
+afterward, and may request `sudo` for only those CPU-hotplug writes. Then collect
+three repeats:
 
 ```bash
 mkdir -p results/salt-vs-hardware-local
@@ -229,7 +238,13 @@ RESULTS_DIR=results/salt-vs-hardware-local \
   --pmc results/salt-vs-hardware-local/pmu.csv
 ```
 
-The defaults model a 32 KiB cache, 64-byte lines, and eight 8-byte elements per line. If the measured L1D geometry differs, pass the corresponding `--cache-size-bytes`, `--cache-line-bytes`, and `--elements-per-cache-line` values. Fresh PMC results are machine-dependent and are not expected to match the packaged i7-7700 values. PMU permissions, CPU topology checks, and hyperthread-isolation requirements are detailed in `salt_vs_hw_misses_package/README.md`.
+The defaults model a 32 KiB cache, 64-byte lines, and eight 8-byte elements per
+line. If the measured L1D geometry differs, pass the corresponding
+`--cache-size-bytes`, `--cache-line-bytes`, and `--elements-per-cache-line`
+values. Fresh PMC results are machine-dependent and are not expected to match
+the packaged i7-7700 values. With `--cpu`, the collector temporarily offlines
+and restores the selected core's sibling threads; PMU permissions, recovery,
+and topology details are documented in `salt_vs_hw_misses_package/README.md`.
 
 ## Full evaluation
 
@@ -277,7 +292,7 @@ The following table maps the paper's figures to the files produced by the full w
 | Figure 1 | `./scripts/run-matmul-t0-t2-evaluation.sh` | `results/matmul-t0-t2/matmul_t0-t2_salt_cachegrind.{svg,pdf,png}` | SALT's predicted cache behavior agrees with Cachegrind for the T0, T1, and T2 matrix-multiplication loop organizations. |
 | Figure 2 | `./scripts/run-mlir-contraction-evaluation.sh` | `results/mlir-contractions/miss_count_comparison_all_programs_{log,linear}.{svg,pdf}` | SALT miss-count predictions are compared with fully associative, 8-way, and 12-way Cachegrind simulations for the original and tiled MLIR contractions. |
 | Figure 3 | `./scripts/run-mlir-contraction-evaluation.sh` | `results/mlir-contractions/timing-selected.{svg,pdf}` with numeric data in `timing-selected.json` and `timing-simulation-wall.tsv` | SALT analysis time is compared with the measured simulation time for the selected contraction kernels. |
-| Figure 4 | `./scripts/run-salt-vs-hardware-evaluation.sh` | `results/salt-vs-hardware/salt_vs_hw_misses.{svg,pdf}` with numeric data in `salt_vs_hw_misses_results.csv` | SALT estimates are compared with measured L1D load misses for 17 kernels. The default workflow uses the checked-in Intel Core i7-7700 measurements. |
+| Figure 4 | `./scripts/run-salt-vs-hardware-evaluation.sh` | `results/salt-vs-hardware/salt_vs_hw_misses.{svg,pdf}` with numeric data in `salt_vs_hw_misses_results.csv` | SALT estimates are compared with measured Linux generic L1D/read/miss events (`L1D.REPLACEMENT` on the reference system) for 17 kernels. The default workflow uses the checked-in Intel Core i7-7700 measurements. |
 
 For Figure 4, the reference data should produce 17 points, MAPE approximately `1.68%` (equivalently, MARE `0.0168`), and Pearson correlation approximately `0.9996`. These values are calculated from the 17-row reference dataset shipped in this release. The unrounded MARE is `0.016824`, or MAPE `1.6824%`, consistent with the `0.0170` MARE shown in Figure 4. Small rendering differences do not change these numeric checks.
 

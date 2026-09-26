@@ -24,6 +24,12 @@ typedef struct {
 
 static inline uint64_t pmc_l1d_miss_config(void)
 {
+    /*
+     * Request Linux's generic L1D/read/miss selector. On the Intel i7-7700,
+     * i7-6700, and Xeon Gold 6126 systems validated for this artifact, Linux
+     * maps it to L1D.REPLACEMENT (event 0x51, umask 0x01), not to the raw
+     * retired-load event MEM_LOAD_RETIRED.L1_MISS (event 0xd1, umask 0x08).
+     */
     return (uint64_t)PERF_COUNT_HW_CACHE_L1D |
            ((uint64_t)PERF_COUNT_HW_CACHE_OP_READ << 8) |
            ((uint64_t)PERF_COUNT_HW_CACHE_RESULT_MISS << 16);

@@ -43,9 +43,16 @@ cleanup are outside the measured interval; only `kernel->execute()` is counted.
 Counter semantics and permissions are documented in
 `../pmc_measurement/README.md`.
 
-PMC values are machine- and run-dependent. Pinning selects a logical CPU but
-does not isolate its physical core. Before measuring, ensure every sibling
-hyperthread on the selected core is offline; see the parent README for topology
-checks. Use the same CPU, affinity, compiler flags, frequency/prefetch
-configuration, and operating-system conditions when comparing a new collection
-with the frozen paper data.
+PMC values are machine- and run-dependent. When `--cpu` is supplied, the
+collector reads the selected CPU's sibling set from Linux sysfs, temporarily
+offlines any online siblings, and restores only the CPUs it changed after the
+collection. It writes sysfs directly when permitted and otherwise requests the
+narrow `sudo tee` operation. If neither succeeds, it exits before measuring.
+Pinning with `taskset` alone is not sufficient: in our i7-6700 validation, an
+online sibling changed some replacement counts by approximately 3x. After an
+unrecoverable interruption such as `SIGKILL` or power loss, verify the sibling
+state manually.
+
+Use the same CPU, affinity, compiler flags, frequency/prefetch configuration,
+and operating-system conditions when comparing a new collection with the
+frozen paper data.
