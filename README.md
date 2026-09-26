@@ -208,9 +208,9 @@ A reproduction is considered successful when:
 ## Figure 4: reference data or local PMCs
 
 The normal artifact command uses the checked-in measurements from an Intel Core
-i7-7700 with hyperthreading disabled. The historical load-miss columns contain
-Linux's generic L1D/read/miss event, which maps to `L1D.REPLACEMENT` on the
-validated Intel systems, not the raw `MEM_LOAD_RETIRED.L1_MISS` event. The
+i7-7700 with hyperthreading disabled on the measurement core. The CSV
+explicitly records Linux's generic L1D/read/miss selector and its
+`L1D.REPLACEMENT` mapping, not the raw `MEM_LOAD_RETIRED.L1_MISS` event. The
 portable workflow does not access the current machine's hardware counters:
 
 ```bash
@@ -296,7 +296,7 @@ The following table maps the paper's figures to the files produced by the full w
 
 For Figure 4, the reference data should produce 17 points, MAPE approximately `1.68%` (equivalently, MARE `0.0168`), and Pearson correlation approximately `0.9996`. These values are calculated from the 17-row reference dataset shipped in this release. The unrounded MARE is `0.016824`, or MAPE `1.6824%`, consistent with the `0.0170` MARE shown in Figure 4. Small rendering differences do not change these numeric checks.
 
-The artifact supports regeneration of all four figures and their intermediate numeric data. Fresh collection of Figure 4's hardware counters is not claimed to be machine-independent: the values depend on the processor, PMU event, compiler, and system configuration. The checked-in i7-7700 CSV is therefore the reference input for reproduction. Instructions for an optional fresh collection, including the CPU-affinity and SMT requirements, are in `salt_vs_hw_misses_package/README.md`.
+The artifact supports regeneration of all four figures and their intermediate numeric data. Fresh collection of Figure 4's hardware counters is not claimed to be machine-independent: the values depend on the processor, PMU event, compiler, and system configuration. The checked-in i7-7700 CSV is therefore the reference input for reproduction. Fresh CSVs identify the `pmu_event`, `pmu_selector`, and neutral `pmc_count` explicitly. Instructions for optional collection, including selected-core sibling isolation, are in `salt_vs_hw_misses_package/README.md`.
 
 Detailed configurations, methodology notes, and individual-stage commands are in:
 

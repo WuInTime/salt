@@ -43,8 +43,12 @@ Xeon Gold 6126 is a Skylake-SP processor and can run the generic Linux
 L1D/read/miss event. On this validated platform, that selector maps to
 `L1D.REPLACEMENT`, not the raw `MEM_LOAD_RETIRED.L1_MISS` event. Its fresh
 replacement totals should not be presented as replacements for the paper's
-i7-7700 measurements. The notebook stores fresh measurements under
-a separately named result directory.
+i7-7700 measurements. The notebook stores fresh measurements under a separately
+named result directory.
+
+For the optional fresh-PMC path, the notebook temporarily offlines only the
+sibling thread on the selected measurement core and restores it after the run;
+it leaves SMT enabled on every other core.
 
 ## Trovi contents
 

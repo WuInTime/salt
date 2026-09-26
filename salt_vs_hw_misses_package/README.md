@@ -4,8 +4,7 @@ This package generates SALT miss-count JSON files from the repository's MLIR,
 compares them with packaged measurements of Linux's generic L1D/read/miss event,
 and creates SVG and PDF plots under `results/salt-vs-hardware/` at the repository
 root. On the Intel systems validated for this artifact, that generic selector
-maps to `L1D.REPLACEMENT`; the historical load-miss labels are retained for
-compatibility with the paper data and plotting workflow.
+maps to `L1D.REPLACEMENT`.
 
 The package includes the exact C sources and PMC collector for the 16
 orig/tiled benchmarks plus original stencil, for 17 benchmarks total.
@@ -138,22 +137,17 @@ tiled_rowwise_softmax_max-salt.json
 The script requires all 17 MLIR inputs and all 17 PMC rows. It reports missing
 or duplicate results rather than silently omitting benchmarks.
 
-## PMC input formats
+## PMC input format
 
-Both packaged PMC formats are accepted:
-
-```text
-program,csv_l1d_load_miss
-orig_matrix_matrix,992723
-```
+The collector writes an explicit, architecture-neutral schema:
 
 ```text
-kernel,L1D.load_miss
-constant_matrix_matrix,992723
+program,pmu_event,pmu_selector,pmc_count
+orig_matrix_matrix,L1D.REPLACEMENT,PERF_TYPE_HW_CACHE:L1D:READ:MISS,992723
 ```
 
-Names beginning with `constant_` are automatically normalized to the graph's
-`orig_` naming convention.
+All PMC inputs must use this schema. The collector also appends `repeats` and
+`all_pmc_values` so each median can be audited.
 
 ## Optional: collect PMCs on another machine
 
@@ -161,11 +155,10 @@ This step is optional for artifact evaluation. The normal Figure 4 workflow
 uses the checked-in `data/pmu_i7-7700_result.csv`, measured on an Intel Core
 i7-7700 with simultaneous multithreading (hyperthreading) disabled.
 
-The CSV's historical load-miss fields contain Linux's generic
-`L1-dcache-load-misses` event. On the validated i7-7700, i7-6700, and Xeon Gold
-6126 systems, Linux maps this selector to `L1D.REPLACEMENT`, not to the raw
-retired-load event `MEM_LOAD_RETIRED.L1_MISS`. Do not mix those two event types
-in one comparison.
+The CSV explicitly identifies Linux's generic `L1-dcache-load-misses` selector
+and its `L1D.REPLACEMENT` mapping. On the validated i7-7700 and Xeon Gold 6126
+systems, this is not the raw retired-load event `MEM_LOAD_RETIRED.L1_MISS`. Do
+not mix those two event types in one comparison.
 
 For a meaningful fresh measurement, pass `--cpu` to pin the benchmark to one
 logical CPU. The collector discovers every other logical CPU sharing that

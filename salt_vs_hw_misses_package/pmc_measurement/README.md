@@ -4,12 +4,12 @@ The evaluator-facing Figure 4 workflow is documented in the package's parent
 `README.md`; this file covers the low-level counter interface.
 
 `pmc_l1d_misses.h` requests Linux's generic `L1-dcache-load-misses` event, using
-`PERF_TYPE_HW_CACHE` with the L1D/read/miss selector. On the Intel Core i7-7700,
-Core i7-6700, and Xeon Gold 6126 systems validated for this artifact, Linux maps
+`PERF_TYPE_HW_CACHE` with the L1D/read/miss selector. On the Intel Core i7-7700
+and Xeon Gold 6126 systems validated for this artifact, Linux maps
 that selector to `L1D.REPLACEMENT` (raw event `0x51`, umask `0x01`). It is not
 the same event as `MEM_LOAD_RETIRED.L1_MISS` (raw event `0xd1`, umask `0x08`).
-The historical `L1D.load_miss` and `csv_l1d_load_miss` labels are retained for
-compatibility with the packaged data and plotting workflow.
+Fresh collector CSVs use the explicit `pmu_event`, `pmu_selector`, and
+`pmc_count` fields; these fields are required by the comparison script.
 
 The counter counts the calling thread only and excludes kernel and hypervisor
 activity.
@@ -24,7 +24,7 @@ taskset -c 1 ./example
 The output is a CSV-style line such as:
 
 ```text
-L1D.load_miss,123456
+L1D.REPLACEMENT,123456
 ```
 
 To instrument another workload, include `pmc_l1d_misses.h`, open the counter,

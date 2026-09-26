@@ -111,11 +111,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def normalize_program(name: str) -> str:
-    name = name.removesuffix(".mlir")
-    if name.startswith("constant_"):
-        return "orig_" + name.removeprefix("constant_")
-    return name
 
 
 def json_name_for(program: str) -> str:
@@ -143,8 +138,7 @@ def generate_salt_jsons(
 ) -> None:
     if not analyzer.is_file():
         raise FileNotFoundError(
-            f"analyzer does not exist: {analyzer}; build it with "
-            "cargo build --locked --release -p analyzer --bin analyzer"
+            f"analyzer does not exist: {analyzer}; rebuild the Docker image"
         )
 
     missing_inputs = [mlir_input_for(program) for program in benchmarks]
@@ -257,35 +251,35 @@ def miss_ratio_at(
     return ratios[-1]
 
 
-def load_pmc(path: Path) -> dict[str, float]:
+def load_pmc(path: Path) -> tuple[dict[str, float], str, str]:
     with path.open(newline="") as stream:
         reader = csv.DictReader(stream)
         fields = set(reader.fieldnames or ())
-        program_column = "program" if "program" in fields else "kernel"
-        if program_column not in fields:
-            raise ValueError(f"{path}: expected a program or kernel column")
-        if "csv_l1d_load_miss" in fields:
-            miss_column = "csv_l1d_load_miss"
-        elif "L1D.load_miss" in fields:
-            miss_column = "L1D.load_miss"
-        else:
-            raise ValueError(
-                f"{path}: expected csv_l1d_load_miss or L1D.load_miss column"
-            )
+        required = {"program", "pmu_event", "pmu_selector", "pmc_count"}
+        missing = sorted(required - fields)
+        if missing:
+            raise ValueError(f"{path}: missing PMC columns: {', '.join(missing)}")
 
         values: dict[str, float] = {}
+        event_names: set[str] = set()
+        selector_names: set[str] = set()
         for row in reader:
-            program = normalize_program(row[program_column].strip())
+            program = row["program"].strip()
             if program in values:
                 raise ValueError(f"{path}: duplicate PMC row for {program}")
             try:
-                value = float(row[miss_column])
+                value = float(row["pmc_count"])
             except (TypeError, ValueError) as error:
                 raise ValueError(f"{path}: invalid PMC value for {program}") from error
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{path}: invalid PMC value for {program}: {value}")
             values[program] = value
-    return values
+            event_names.add(row["pmu_event"].strip())
+            selector_names.add(row["pmu_selector"].strip())
+
+    if len(event_names) != 1 or len(selector_names) != 1:
+        raise ValueError(f"{path}: PMC rows must use one event and one selector")
+    return values, event_names.pop(), selector_names.pop()
 
 
 def derive_results(
@@ -294,7 +288,7 @@ def derive_results(
     if args.cache_size_bytes <= 0 or args.cache_line_bytes <= 0:
         raise ValueError("cache and line sizes must be positive")
     cache_lines = args.cache_size_bytes / args.cache_line_bytes
-    pmc = load_pmc(args.pmc)
+    pmc, pmu_event, pmu_selector = load_pmc(args.pmc)
     json_files = index_json_files(args.salt_json_dir, benchmarks)
 
     missing_pmc = [program for program in benchmarks if program not in pmc]
@@ -324,7 +318,9 @@ def derive_results(
         rows.append(
             {
                 "program": program,
-                "csv_l1d_load_miss": measured,
+                "pmu_event": pmu_event,
+                "pmu_selector": pmu_selector,
+                "pmc_count": measured,
                 "salt_estimated_miss_count": round(estimated, 1),
                 "relative_error": round(relative_error, 4),
                 "salt_miss_ratio": round(ratio, 4),
@@ -346,7 +342,7 @@ def write_results(rows: list[dict[str, Any]], path: Path) -> None:
 
 
 def plot_results(rows: list[dict[str, Any]], path: Path) -> tuple[float, float]:
-    measured = np.asarray([row["csv_l1d_load_miss"] for row in rows], dtype=float)
+    measured = np.asarray([row["pmc_count"] for row in rows], dtype=float)
     estimated = np.asarray(
         [row["salt_estimated_miss_count"] for row in rows], dtype=float
     )
@@ -361,7 +357,7 @@ def plot_results(rows: list[dict[str, Any]], path: Path) -> tuple[float, float]:
     ax.scatter(measured, estimated, s=100, alpha=0.8)
     maximum = float(np.nanmax(np.concatenate([measured, estimated])))
     ax.plot([0, maximum], [0, maximum], "k--", alpha=0.6)
-    ax.set_xlabel("Measured L1D load misses")
+    ax.set_xlabel(f"Measured PMC count ({rows[0]['pmu_event']})")
     ax.set_ylabel("SALT-predicted misses")
     annotation = f" N={len(rows)}\nMAPE={mape:.2f}%\nPearson r={pearson_r:.4f}"
     ax.text(

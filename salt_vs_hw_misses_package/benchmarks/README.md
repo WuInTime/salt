@@ -48,7 +48,7 @@ collector reads the selected CPU's sibling set from Linux sysfs, temporarily
 offlines any online siblings, and restores only the CPUs it changed after the
 collection. It writes sysfs directly when permitted and otherwise requests the
 narrow `sudo tee` operation. If neither succeeds, it exits before measuring.
-Pinning with `taskset` alone is not sufficient: in our i7-6700 validation, an
+Pinning with `taskset` alone is not sufficient: during validation, an
 online sibling changed some replacement counts by approximately 3x. After an
 unrecoverable interruption such as `SIGKILL` or power loss, verify the sibling
 state manually.

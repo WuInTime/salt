@@ -18,6 +18,8 @@ HERE = Path(__file__).resolve().parent
 RUNNER = HERE / "bin" / "benchmark_runner"
 DEFAULT_OUTPUT = HERE.parent / "data" / "pmu_results_17_new.csv"
 CPU_SYSFS_ROOT = Path("/sys/devices/system/cpu")
+PMU_EVENT = "L1D.REPLACEMENT"
+PMU_SELECTOR = "PERF_TYPE_HW_CACHE:L1D:READ:MISS"
 
 
 def parse_cpu_list(value: str) -> set[int]:
@@ -207,9 +209,11 @@ def collect(args: argparse.Namespace) -> int:
         rows.append(
             {
                 "program": name,
-                "csv_l1d_load_miss": round(statistics.median(values)),
+                "pmu_event": PMU_EVENT,
+                "pmu_selector": PMU_SELECTOR,
+                "pmc_count": round(statistics.median(values)),
                 "repeats": args.repeats,
-                "all_l1d_load_miss_values": ";".join(map(str, values)),
+                "all_pmc_values": ";".join(map(str, values)),
             }
         )
 

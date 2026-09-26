@@ -11,7 +11,6 @@ contraction_root="$repository_root/benchmarks/mlir-contractions"
 constant_dir="$contraction_root/constant"
 source_tiled_dir="$constant_dir/tiled"
 results_dir=${RESULTS_DIR:-"$repository_root/results/mlir-contractions"}
-build_dir="$repository_root/target"
 work_dir="$results_dir/work"
 staged_constant_dir="$work_dir/constant"
 tiled_dir="$staged_constant_dir/tiled"
@@ -26,18 +25,17 @@ elif [[ $# -ne 0 ]]; then
     exit 2
 fi
 
-echo "Building Barvinok/SALT analyzer and Cachegrind runner..."
-cargo build --locked --release -p analyzer --bin analyzer \
-    --features analyzer/barvinok \
-    --manifest-path "$repository_root/Cargo.toml"
-cargo build --locked --release -p cachegrind-runner --bin cachegrind-runner \
-    --manifest-path "$repository_root/Cargo.toml"
+analyzer=/usr/local/bin/analyzer
+cachegrind_runner=/usr/local/bin/cachegrind-runner
+for executable in "$analyzer" "$cachegrind_runner"; do
+    if [[ ! -x $executable ]]; then
+        echo "Required artifact binary is missing or not executable: $executable" >&2
+        echo "Rebuild the Docker image before running this evaluation." >&2
+        exit 1
+    fi
+done
 
-analyzer="$build_dir/release/analyzer"
-cachegrind_runner="$build_dir/release/cachegrind-runner"
-
-# Stage inputs only after the potentially long builds. This also recreates the
-# output tree if an earlier result directory was cleaned while Cargo ran.
+# Stage inputs before starting the evaluation.
 mkdir -p "$tiled_dir" "$results_dir"
 
 for input in "$constant_dir"/constant_*.mlir; do

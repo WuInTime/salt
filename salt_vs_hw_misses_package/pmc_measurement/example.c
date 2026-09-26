@@ -37,7 +37,7 @@ int main(void)
     }
     pmc_l1d_misses_close(&counter);
 
-    printf("L1D.load_miss,%" PRIu64 "\n", misses);
+    printf("L1D.REPLACEMENT,%" PRIu64 "\n", misses);
     fprintf(stderr, "checksum=%" PRIu64 "\n", sum);
     free(data);
     return 0;

@@ -123,13 +123,11 @@ def main():
         type=Path,
         help="fully-associative database corresponding to --simulation-times",
     )
-    parser.add_argument(
-        "--analyzer", type=Path, default=REPOSITORY_ROOT / "target/release/analyzer"
-    )
+    parser.add_argument("--analyzer", type=Path, default=Path("/usr/local/bin/analyzer"))
     parser.add_argument(
         "--cachegrind-runner",
         type=Path,
-        default=REPOSITORY_ROOT / "target/release/cachegrind-runner",
+        default=Path("/usr/local/bin/cachegrind-runner"),
     )
     args = parser.parse_args()
     if args.repetitions < 1:

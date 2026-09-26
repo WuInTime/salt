@@ -9,7 +9,6 @@ package_dir="$repository_root/salt_vs_hw_misses_package"
 results_dir=${RESULTS_DIR:-"$repository_root/results/salt-vs-hardware"}
 salt_json_dir="$results_dir/salt-json"
 pmc_input="$package_dir/data/pmu_i7-7700_result.csv"
-build_dir="$repository_root/target"
 smoke_test=false
 cache_size_bytes=32768
 cache_line_bytes=64
@@ -54,10 +53,12 @@ done
 
 mkdir -p "$results_dir"
 
-echo "Building SALT analyzer..."
-cargo build --locked --release -p analyzer --bin analyzer \
-    --manifest-path "$repository_root/Cargo.toml"
-analyzer="$build_dir/release/analyzer"
+analyzer=/usr/local/bin/analyzer
+if [[ ! -x $analyzer ]]; then
+    echo "Required artifact binary is missing or not executable: $analyzer" >&2
+    echo "Rebuild the Docker image before running this evaluation." >&2
+    exit 1
+fi
 
 python_args=(
     --analyzer "$analyzer"
